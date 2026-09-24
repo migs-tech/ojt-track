@@ -47,6 +47,8 @@ class UserAttendanceController {
             $data[] = [
                 "id"        => $row["id"],
                 "date"      => $formattedDate,
+                "date_iso"  => date("Y-m-d", strtotime($row['date'])),
+                "status"    => (int) $row["status"],
                 "time_in"   => $timeIn,
                 "time_out"  => $timeOut,
                 "duration"  => $duration,
@@ -60,10 +62,20 @@ class UserAttendanceController {
         $totalSecs = $totalSeconds % 60;
         $totalFormatted = "{$totalHours}h {$totalMinutes}m {$totalSecs}s";
     
+        $todayIso = date("Y-m-d");
+        $todayRecord = null;
+        foreach ($data as $record) {
+            if ($record["date_iso"] === $todayIso) {
+                $todayRecord = $record;
+                break;
+            }
+        }
+
         return [
             "total_hours" => $totalFormatted,
             "days_count"  => count($data),
-            "records"     => $data
+            "records"     => $data,
+            "today"       => $todayRecord
         ];
     }
 
@@ -137,11 +149,20 @@ class UserAttendanceController {
                    AND time_in IS NOT NULL
                    AND time_out IS NULL"
             );
-            $success = $stmt->execute(['trainee_id' => $userId, 'timeOut' => $timeOut, 'today' => $today]);
-    
+            $stmt->execute(['trainee_id' => $userId, 'timeOut' => $timeOut, 'today' => $today]);
+
+            // Nothing updated means there was no time-in today.
+            if ($stmt->rowCount() === 0) {
+                return [
+                    "success" => false,
+                    "message" => "You haven't timed in today. Ask your supervisor to scan your QR code first."
+                ];
+            }
+
             return [
-                "success" => $success ? true : false,
-                "message" => $success ? "Time out recorded" : "Failed to record time out"
+                "success"  => true,
+                "message"  => "Time out recorded",
+                "time_out" => date("h:i A", strtotime($timeOut))
             ];
         } catch (Exception $e) {
             return [

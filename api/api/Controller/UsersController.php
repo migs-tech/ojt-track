@@ -200,6 +200,10 @@ class UsersController {
             if ($user && password_verify($password, $user['password'])) {
                 // Staff accounts sign in on the web dashboard, which always sends a captcha.
                 if (in_array((int) $user['role'], Access::STAFF, true)) {
+                    // The mobile app never sends a captcha; point staff to the website instead.
+                    if (($params['data']['client'] ?? '') === 'app') {
+                        return ['success' => false, 'message' => 'Admins and coordinators sign in on the OJT Track website.'];
+                    }
                     if (!$this->verifyCaptcha($captcha_token)) {
                         return ['success' => false, 'message' => 'Captcha verification failed.'];
                     }
@@ -430,7 +434,17 @@ class UsersController {
             $files  = $params['files'] ?? [];
 
             if (!isset($files['files'])) {
-                return ['success' => false, 'message' => 'No files uploaded'];
+                return ['success' => false, 'message' => 'Please add a photo of your work.'];
+            }
+
+            // Store the calendar day in the server's time zone (the app may send an ISO time in UTC).
+            $time = strtotime((string) ($data['date'] ?? '')) ?: time();
+            $data['date'] = date('Y-m-d', $time);
+            if ($data['date'] > date('Y-m-d')) {
+                return ['success' => false, 'message' => "You can't submit a report for a future date."];
+            }
+            if (trim((string) ($data['title'] ?? '')) === '' || trim((string) ($data['description'] ?? '')) === '') {
+                return ['success' => false, 'message' => 'Please enter a title and a description.'];
             }
 
             $stmt = $this->conn->prepare(
@@ -570,33 +584,63 @@ class UsersController {
                 ];
             }
     
+            $nameStmt = $this->conn->prepare(
+                "SELECT COALESCE(NULLIF(complete_name, ''), username) FROM users WHERE id = :id"
+            );
+            $nameStmt->execute(['id' => $traineeId]);
+            $traineeName = (string) $nameStmt->fetchColumn();
+
+            // Don't overwrite a time-in that was already recorded today.
+            $todayStmt = $this->conn->prepare(
+                "SELECT time_in, time_out FROM trainee_attendance
+                 WHERE trainee_id = :trainee_id AND date = :date AND time_in IS NOT NULL"
+            );
+            $todayStmt->execute(['trainee_id' => $traineeId, 'date' => date('Y-m-d')]);
+            if ($today = $todayStmt->fetch(PDO::FETCH_ASSOC)) {
+                $at = date('g:i A', strtotime($today['time_in']));
+                return [
+                    'success' => false,
+                    'message' => $today['time_out']
+                        ? "$traineeName already timed in and out today."
+                        : "$traineeName already timed in today at $at.",
+                ];
+            }
+
+            // Mark the code used; if two scans race, only one of them wins.
             $update = $this->conn->prepare(
-                "UPDATE qr_codes SET is_used = 1 WHERE id = :id"
+                "UPDATE qr_codes SET is_used = 1 WHERE id = :id AND is_used = 0"
             );
             $update->execute(['id' => $existingQr['id']]);
-    
+            if ($update->rowCount() === 0) {
+                return ['success' => false, 'message' => 'This QR code was already used.'];
+            }
+
+            // Replaces an "absent" row for today, if the daily checker made one.
             $attendanceStmt = $this->conn->prepare(
-                "INSERT INTO trainee_attendance (trainee_id, date, time_in, status, remarks) 
+                "INSERT INTO trainee_attendance (trainee_id, date, time_in, status, remarks)
                  VALUES (:trainee_id, :date, :time_in, :status, :remarks)
-                 ON DUPLICATE KEY UPDATE 
-                    time_in = VALUES(time_in), 
-                    status = VALUES(status), 
-                    remarks = VALUES(remarks), 
+                 ON DUPLICATE KEY UPDATE
+                    time_in = VALUES(time_in),
+                    status = VALUES(status),
+                    remarks = VALUES(remarks),
                     updated_at = CURRENT_TIMESTAMP"
             );
-    
+
+            $timeIn = date('Y-m-d H:i:s');
             $attendanceStmt->execute([
                 'trainee_id' => $traineeId,
                 'date'       => date('Y-m-d'),
-                'time_in'    => date('Y-m-d H:i:s'),
+                'time_in'    => $timeIn,
                 'status'     => 1,
                 'remarks'    => 'Checked in via QR code'
             ]);
-    
+
             return [
                 'success'       => true,
                 'message'       => 'Attendance recorded.',
-                'attendance_id' => $this->conn->lastInsertId()
+                'attendance_id' => $this->conn->lastInsertId(),
+                'trainee_name'  => $traineeName,
+                'time_in'       => date('g:i A', strtotime($timeIn)),
             ];
     
         } catch (PDOException $e) {
