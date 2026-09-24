@@ -1,0 +1,15 @@
+RewriteEngine On
+RewriteBase /api/
+
+# Allow direct access to uploads folder
+RewriteCond %{REQUEST_URI} ^/api/uploads/ [NC]
+RewriteRule ^ - [L]
+
+# Redirect all other requests to api.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ api.php [QSA,L]
+
+# Enable error logging
+php_flag log_errors On
+php_value error_log /Applications/XAMPP/xamppfiles/htdocs/ojt/logs/error.log

@@ -1,0 +1,4 @@
+logs
+*.log
+composer.lock
+cache/

@@ -1,0 +1,29 @@
+# Secrets
+api/api/config.php
+.env
+.env*.local
+mobile/google-services.json
+*.pem
+*.key
+*.jks
+*.p8
+*.p12
+
+# Data / user uploads
+*.sql
+!database/schema.sql
+api/api/uploads/*
+!api/api/uploads/.gitkeep
+
+# Dependencies & builds
+node_modules/
+vendor/
+dist/
+.expo/
+web-build/
+
+# Logs & OS
+*.log
+logs/
+.DS_Store
+Thumbs.db

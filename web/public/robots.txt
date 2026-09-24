@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://ojt-track.kamsite.com/sitemap.xml
