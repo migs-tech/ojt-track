@@ -28,7 +28,12 @@ define('MAIL_REPLYTO_EMAIL', $env('MAIL_REPLYTO_EMAIL', $env('MAIL_FROM_EMAIL', 
 define('MAIL_REPLYTO_NAME', $env('MAIL_REPLYTO_NAME', 'OJT Track'));
 
 define('RECAPTCHA_SECRET_KEY', $env('RECAPTCHA_SECRET_KEY', ''));
-define('OPENAI_API_KEY', $env('OPENAI_API_KEY', ''));
+// AI features (report summaries and the assistant). Any OpenAI-compatible service works,
+// e.g. Google Gemini's free tier: AI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+// and AI_MODEL=gemini-flash-latest. Leave the key empty to turn AI off.
+define('OPENAI_API_KEY', $env('AI_API_KEY', $env('OPENAI_API_KEY', '')));
+define('AI_BASE_URL', rtrim($env('AI_BASE_URL', 'https://api.openai.com/v1'), '/'));
+define('AI_MODEL', $env('AI_MODEL', 'gpt-4o-mini'));
 // cloudinary://<api_key>:<api_secret>@<cloud_name>  (store uploads on Cloudinary instead of local disk)
 define('CLOUDINARY_URL', $env('CLOUDINARY_URL', ''));
 

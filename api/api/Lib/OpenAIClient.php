@@ -1,11 +1,19 @@
 <?php
 class OpenAIClient {
     private static $apiKey = OPENAI_API_KEY; 
-    private static $apiUrl = 'https://api.openai.com/v1/chat/completions';
 
-    public static function sendMessage($message, $model = 'gpt-3.5-turbo') {
+    private static function apiUrl() {
+        $base = defined('AI_BASE_URL') ? AI_BASE_URL : 'https://api.openai.com/v1';
+        return rtrim($base, '/') . '/chat/completions';
+    }
+
+    private static function model() {
+        return defined('AI_MODEL') && AI_MODEL !== '' ? AI_MODEL : 'gpt-4o-mini';
+    }
+
+    public static function sendMessage($message, $model = null) {
         if (!self::$apiKey) {
-            throw new Exception('OpenAI API key is not defined.');
+            throw new Exception('AI API key is not defined.');
         }
     
         $systemMessage = [
@@ -30,7 +38,7 @@ class OpenAIClient {
         }
     
         $data = [
-            'model' => $model,
+            'model' => $model ?: self::model(),
             'messages' => $messages
         ];
     
@@ -39,7 +47,7 @@ class OpenAIClient {
             'Authorization: ' . 'Bearer ' . self::$apiKey
         ];
     
-        $ch = curl_init(self::$apiUrl);
+        $ch = curl_init(self::apiUrl());
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_POST, true);
@@ -67,7 +75,7 @@ class OpenAIClient {
         $image = $params['image_url'] ?? ''; // optional
 
         $data = [
-            "model" => "gpt-4o-mini",
+            "model" => self::model(),
             "messages" => [
                 [
                     "role" => "system",
@@ -96,7 +104,7 @@ class OpenAIClient {
             "Authorization: " . "Bearer " . self::$apiKey
         ];
 
-        $ch = curl_init(self::$apiUrl);
+        $ch = curl_init(self::apiUrl());
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_POST, true);

@@ -58,7 +58,7 @@ Collect the values marked **📋** as you go. You'll paste them into Render in s
 3. Fill in the values from steps 1 to 4. For the addresses:
    - `BASE_URL`: `https://ojt-track-api.onrender.com` (use the name Render shows, with no trailing slash)
    - `APP_URL` and `ALLOWED_ORIGINS`: your Vercel address from step 6, for example `https://ojt-track.vercel.app`. Put a placeholder for now and update it after step 6.
-   - `OPENAI_API_KEY`: leave empty to turn AI features off. Otherwise, set a monthly spending limit in your OpenAI account first.
+   - `AI_API_KEY`: leave empty to turn AI features off. For a free key, sign in at [aistudio.google.com](https://aistudio.google.com) → **Get API key** → **Create API key**. `AI_BASE_URL` and `AI_MODEL` already point to Gemini. To use OpenAI instead, set `AI_BASE_URL` to `https://api.openai.com/v1`, `AI_MODEL` to `gpt-4o-mini`, and a monthly spending limit in your OpenAI account.
 4. Deploy. When it's done, open `https://<your-api>.onrender.com/api/health`. It should show `{"ok":true,...}`.
 5. In the service's **Environment** tab, copy the generated **CRON_SECRET**. 📋 You'll need it in step 7.
 

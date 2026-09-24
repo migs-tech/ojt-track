@@ -54,6 +54,11 @@ services:
       - key: TOKEN_TTL_DAYS
         value: "30"
 
-      # Optional: AI report summaries and assistant (leave empty to turn off)
-      - key: OPENAI_API_KEY
+      # Optional: AI report summaries and assistant (leave AI_API_KEY empty to turn off).
+      # Free option: a Google Gemini key from aistudio.google.com
+      - key: AI_API_KEY
         sync: false
+      - key: AI_BASE_URL
+        value: https://generativelanguage.googleapis.com/v1beta/openai
+      - key: AI_MODEL
+        value: gemini-flash-latest
