@@ -105,7 +105,8 @@ export default function StudentMailScreen() {
           intervalRef.current = null;
         }
       };
-    }, [qrData])
+      // Restart polling only when the QR itself changes, not on every refresh response
+    }, [qrData?.qr, qrData?.expires_at, qrData?.is_used])
   );
 
   // Countdown timer

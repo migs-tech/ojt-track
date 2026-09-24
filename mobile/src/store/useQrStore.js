@@ -29,6 +29,10 @@ export const useQrStore = create((set) => ({
     try {
       const res = await api.post('/user/fetchOrGenerateQrCode');  
       const qr = res.data?.qr;
+      if (!qr) {
+        set({ qrData: null, status: "" });
+        return;
+      }
       set({
         qrData: {
           qr: qr?.qr_code,

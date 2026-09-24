@@ -63,9 +63,17 @@ export default function HomeIndex() {
   const [message, setMessage] = useState(null);
   const [isNotAllowToGenerateOtp, setIsNotAllowToGenerateOtp] = useState(false);
 
+  // Load the QR once each time the screen is shown. (Fetching inside the effect below made
+  // it run again on every response, sending requests in an endless loop.)
   useFocusEffect(
     useCallback(() => {
-       fetchQrCode();
+      fetchQrCode();
+    }, [fetchQrCode])
+  );
+
+  // Work out whether a new OTP is allowed from the current QR
+  useEffect(() => {
+    {
       if (!qrData) {
         setIsNotAllowToGenerateOtp(false);
         return;
@@ -84,8 +92,8 @@ export default function HomeIndex() {
       } else {
         setIsNotAllowToGenerateOtp(false);
       }
-    }, [qrData])
-  );
+    }
+  }, [qrData]);
     
   const showMessage = (text, type) => {
       setMessage({ text, type });
