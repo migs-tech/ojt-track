@@ -64,7 +64,11 @@
       "typedRoutes": true
     },
     "extra": {
-      "router": {}
-    }
+      "router": {},
+      "eas": {
+        "projectId": "9e435f11-37b6-4b8b-b0ef-127a79b1922f"
+      }
+    },
+    "owner": "migsse"
   }
 }
