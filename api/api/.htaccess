@@ -1,15 +1,27 @@
 RewriteEngine On
 RewriteBase /api/
 
-# Allow direct access to uploads folder
+# Uploaded files are served as-is (scripts are blocked by uploads/.htaccess)
 RewriteCond %{REQUEST_URI} ^/api/uploads/ [NC]
 RewriteRule ^ - [L]
 
-# Redirect all other requests to api.php
+# Pass the Authorization header through to PHP
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+# Everything else goes to the API router
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^(.*)$ api.php [QSA,L]
 
-# Enable error logging
-php_flag log_errors On
-php_value error_log /Applications/XAMPP/xamppfiles/htdocs/ojt/logs/error.log
+# Only the router may run as PHP; other PHP files are included by it, never requested directly.
+<FilesMatch "\.php$">
+    Require all denied
+</FilesMatch>
+<Files "api.php">
+    Require all granted
+</Files>
+# Never serve config files or logs
+<FilesMatch "^(config.*\.php|.*\.log|\.env.*)$">
+    Require all denied
+</FilesMatch>

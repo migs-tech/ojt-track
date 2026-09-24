@@ -2,7 +2,10 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-const API_BASE_URL = 'https://ojt.kamsite.com/api';
+// Set EXPO_PUBLIC_API_URL (in .env or the EAS build profile) to your API server, e.g. https://ojt-api.onrender.com/api
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080/api';
+// The web app, used for the instruction pages
+export const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL || 'http://localhost:5173';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

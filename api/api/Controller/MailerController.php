@@ -37,6 +37,11 @@ class MailerController {
      * @return array
      */
     public static function sendEmail(array $params) {
+        // Hosts like Render's free plan block SMTP, so an HTTP email API is used when configured.
+        if (defined('BREVO_API_KEY') && BREVO_API_KEY !== '') {
+            return self::sendWithBrevo($params);
+        }
+
         $mail = new PHPMailer(true);
 
         try {
@@ -96,5 +101,56 @@ class MailerController {
                 'message' => safeError($e)
             ];
         }
+    }
+
+    /** Sends through Brevo's HTTP API (https://developers.brevo.com/reference/sendtransacemail). */
+    private static function sendWithBrevo(array $params): array {
+        $list = function ($value) {
+            $items = is_array($value) ? $value : (empty($value) ? [] : [$value]);
+            return array_map(fn ($email) => ['email' => $email], array_values($items));
+        };
+
+        $payload = [
+            'sender'      => ['email' => MAIL_FROM_EMAIL, 'name' => MAIL_FROM_NAME],
+            'replyTo'     => ['email' => MAIL_REPLYTO_EMAIL ?: MAIL_FROM_EMAIL, 'name' => MAIL_REPLYTO_NAME],
+            'to'          => $list($params['to'] ?? []),
+            'subject'     => $params['subject'] ?? '',
+            'htmlContent' => $params['body'] ?? '',
+        ];
+        if (!empty($params['cc']))  $payload['cc']  = $list($params['cc']);
+        if (!empty($params['bcc'])) $payload['bcc'] = $list($params['bcc']);
+
+        if (!empty($params['files'])) {
+            $files = is_array($params['files']) ? $params['files'] : [$params['files']];
+            $names = $params['fileNames'] ?? [];
+            $names = is_array($names) ? $names : [$names];
+            foreach ($files as $i => $file) {
+                if (is_file($file)) {
+                    $payload['attachment'][] = [
+                        'name'    => $names[$i] ?? basename($file),
+                        'content' => base64_encode(file_get_contents($file)),
+                    ];
+                }
+            }
+        }
+
+        $ch = curl_init('https://api.brevo.com/v3/smtp/email');
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_HTTPHEADER     => ['api-key: ' . BREVO_API_KEY, 'Content-Type: application/json', 'Accept: application/json'],
+            CURLOPT_POSTFIELDS     => json_encode($payload),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 20,
+        ]);
+        $body = curl_exec($ch);
+        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($status >= 200 && $status < 300) {
+            return ['success' => true, 'message' => 'Email sent successfully.'];
+        }
+        error_log('[mail] Brevo send failed (' . $status . '): ' . ($error ?: substr((string) $body, 0, 300)));
+        return ['success' => false, 'message' => 'Failed to send email.'];
     }
 }

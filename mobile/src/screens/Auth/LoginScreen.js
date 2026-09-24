@@ -91,7 +91,7 @@ export default function LoginScreen() {
         <Animated.View entering={FadeInDown.delay(200)} style={styles.header}>
           <View style={styles.logoContainer}>
             <Image
-              source={{ uri: 'https://ojt.kamsite.com/api/uploads/systemFiles/logo.png' }}
+              source={require('../../../assets/images/icon.png')}
               style={styles.logo}
             />
           </View>

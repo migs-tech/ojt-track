@@ -56,8 +56,13 @@ class Upload {
             throw new RuntimeException('Could not save the file.');
         }
 
+        $url = Storage::publish($dir . $name, $mime);
+        if (Storage::usesCloudinary()) {
+            @unlink($dir . $name); // the Cloudinary copy is the only one kept
+        }
+
         return [
-            'url'  => rtrim(BASE_URL, '/') . '/api/uploads/' . $subdir . '/' . $name,
+            'url'  => $url,
             'path' => $dir . $name,
             'name' => $name,
             'original_name' => basename((string) ($file['name'] ?? '')),

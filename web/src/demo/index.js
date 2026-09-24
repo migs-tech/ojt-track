@@ -151,7 +151,7 @@ const routes = {
     return ok("Teacher verified.");
   },
 
-  "trainee/getEvaluationsTrainee": () => ({ success: true, data: db.evaluations }),
+  "admin/getEvaluationsTrainee": () => ({ success: true, data: db.evaluations }),
   "admin/getAllEvaluations": () => ({ success: true, data: db.evaluations }),
 };
 

@@ -21,8 +21,8 @@
             Register
           </button>
           <a
-            v-if="!isDemo"
-            href="https://ojt.kamsite.com/api/uploads/app/ojt-tracking.apk"
+            v-if="apkDownloadUrl"
+            :href="apkDownloadUrl"
             download="ojt-tracking.apk"
             class="px-5 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition duration-200 shadow-md hover:shadow-lg flex items-center space-x-2"
           >
@@ -49,8 +49,8 @@
           Register
         </button>
         <a
-          v-if="!isDemo"
-            href="https://ojt.kamsite.com/api/uploads/app/ojt-tracking.apk"
+          v-if="apkDownloadUrl"
+            :href="apkDownloadUrl"
           download="ojt-tracking.apk"
           class="px-5 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition duration-200 shadow-md hover:shadow-lg flex items-center space-x-2"
         >
@@ -92,7 +92,7 @@
                 </div>
 
                 <!-- Right Visual -->
-                <div class="relative flex-1 w-full">
+                <div v-if="apkUrl" class="relative flex-1 w-full">
                 <div class="relative w-full h-96 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 shadow-2xl">
                     <div class="qrcode-container">
                     <h2>{{ isDemo ? "Scan to open the demo on your phone" : "Scan to download the APP" }}</h2>
@@ -202,9 +202,9 @@ const router = useRouter();
 const goToRegister = () => router.push("/register");
 const goToLogin = () => router.push("/login");
 
-const apkUrl = isDemo
-  ? window.location.origin + import.meta.env.BASE_URL
-  : "https://ojt.kamsite.com/api/uploads/app/ojt-tracking.apk";
+// Link to the Android app (e.g. a GitHub release asset). Download buttons and QR are hidden when not set.
+const apkDownloadUrl = isDemo ? "" : import.meta.env.VITE_APK_URL || "";
+const apkUrl = isDemo ? window.location.origin + import.meta.env.BASE_URL : apkDownloadUrl;
 </script>
 
 <style scoped>

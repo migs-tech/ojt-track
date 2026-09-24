@@ -125,7 +125,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import axios from 'axios'
+import api from '@/api/api'
 
 const evaluations = ref([])
 const selectedEvaluation = ref(null)
@@ -163,7 +163,7 @@ const openModal = (item) => {
 
 const fetchEvaluations = async () => {
   try {
-    const res = await axios.post("https://ojt.kamsite.com/api/trainee/getEvaluationsTrainee")
+    const res = await api.post("admin/getEvaluationsTrainee")
     evaluations.value = res.data.data || []
   } catch (err) {
     console.error("Error loading evaluations:", err)

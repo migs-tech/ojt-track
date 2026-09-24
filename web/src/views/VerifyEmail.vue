@@ -63,7 +63,7 @@
 
 <script setup>
 import { ref, onMounted } from "vue";
-import axios from "axios";
+import api from "@/api/api";
 
 const loading = ref(true);
 const verified = ref(false);
@@ -75,7 +75,7 @@ console.log("Token:", token);
 
 onMounted(async () => {
   try {
-    const res = await axios.post("https://ojt.kamsite.com/api/user/verifyEmailToken", {
+    const res = await api.post("user/verifyEmailToken", {
       token: token,
     });
 

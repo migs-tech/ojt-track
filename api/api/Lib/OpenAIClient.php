@@ -43,6 +43,7 @@ class OpenAIClient {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
     
         $response = curl_exec($ch);
@@ -59,6 +60,9 @@ class OpenAIClient {
      * Summarize daily report with optional image
      */
     public static function sendReportSummarize($params) {
+        if (!self::$apiKey) {
+            return null; // AI summary is optional
+        }
         $description = $params['description'] ?? '';
         $image = $params['image_url'] ?? ''; // optional
 
@@ -96,6 +100,7 @@ class OpenAIClient {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
 
         $response = curl_exec($ch);
@@ -109,10 +114,4 @@ class OpenAIClient {
         return $result['choices'][0]['message']['content'] ?? null;
     }
 
-    /**
-     * For debugging
-     */
-    public static function test() {
-        return "check api key: " . self::$apiKey;
-    }
 }

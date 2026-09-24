@@ -15,6 +15,9 @@ define('DB_PORT', (int) $env('DB_PORT', 3306));
 // Path to a CA bundle enables TLS for the database connection (required by TiDB Cloud).
 define('DB_SSL_CA', $env('DB_SSL_CA', ''));
 
+// Email: set BREVO_API_KEY to send through Brevo's HTTP API (needed on Render free, which blocks SMTP).
+// Otherwise the SMTP settings below are used.
+define('BREVO_API_KEY', $env('BREVO_API_KEY', ''));
 define('MAIL_HOST', $env('MAIL_HOST', ''));
 define('MAIL_USERNAME', $env('MAIL_USERNAME', ''));
 define('MAIL_PASSWORD', $env('MAIL_PASSWORD', ''));
@@ -26,9 +29,13 @@ define('MAIL_REPLYTO_NAME', $env('MAIL_REPLYTO_NAME', 'OJT Track'));
 
 define('RECAPTCHA_SECRET_KEY', $env('RECAPTCHA_SECRET_KEY', ''));
 define('OPENAI_API_KEY', $env('OPENAI_API_KEY', ''));
+// cloudinary://<api_key>:<api_secret>@<cloud_name>  (store uploads on Cloudinary instead of local disk)
+define('CLOUDINARY_URL', $env('CLOUDINARY_URL', ''));
 
 // Public URL of this API server, without a trailing slash (e.g. https://ojt-api.onrender.com)
 define('BASE_URL', rtrim($env('BASE_URL', 'http://localhost:8080'), '/'));
+// Public URL of the web app (used in email links and the email logo)
+define('APP_URL', rtrim($env('APP_URL', 'http://localhost:5173'), '/'));
 // Web apps allowed to call the API from a browser, comma-separated
 define('ALLOWED_ORIGINS', $env('ALLOWED_ORIGINS', 'http://localhost:5173'));
 // Secret for scheduled jobs (send as header X-Cron-Secret or ?key=)

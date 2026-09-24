@@ -1246,7 +1246,7 @@ class UsersController {
                         'body'    => $body
                     ]);
 
-                    if ($mail) {
+                    if (!empty($mail['success'])) {
                         $this->notification->sendNotificationByUserId(
                             $traineeId,
                             "OTP sent to your email",
@@ -1316,7 +1316,7 @@ class UsersController {
     /** Export all users to an Excel file
      */
     public function exportUsersToExcel() {
-        $stmt = $this->conn->prepare("SELECT * FROM users");
+        $stmt = $this->conn->prepare("SELECT id, username, email, role FROM users");
         $stmt->execute();
         $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
         if (empty($users)) {
@@ -1339,13 +1339,13 @@ class UsersController {
         }
 
         $writer = new Xlsx($spreadsheet);
-        $fileName = 'users_' . date('Ymd_His') . '.xlsx';
+        $fileName = Storage::randomName('users_' . date('Ymd_His'), 'xlsx');
         $filePath = __DIR__ . '/../uploads/' . $fileName;
         $writer->save($filePath);
         return [
             'success' => true,
             'message' => 'Users exported successfully.',
-            'file'    => BASE_URL . '/api/uploads/' . $fileName
+            'file'    => Storage::publish($filePath, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         ];
         
     }
@@ -1435,13 +1435,13 @@ class UsersController {
         $sheet->setCellValue('D' . ($row + 1), sprintf("%02d:%02d", $totalHours, $totalMins));
 
         $writer = new Xlsx($spreadsheet);
-        $fileName = 'user_hours_' . date('Ymd_His') . '.xlsx';
+        $fileName = Storage::randomName('user_hours_' . date('Ymd_His'), 'xlsx');
         $filePath = __DIR__ . '/../uploads/' . $fileName;
         $writer->save($filePath);
         return [
             'success' => true,
             'message' => 'User hours exported successfully.',
-            'file'    => BASE_URL . '/api/uploads/' . $fileName
+            'file'    => Storage::publish($filePath, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         ];
     
     }
@@ -1759,7 +1759,7 @@ class UsersController {
             'body'    => $template['body']
         ]);
 
-        if (!$mail) {
+        if (empty($mail['success'])) {
             return ['success' => false, 'message' => 'Failed to send the email. Please try again later.'];
         }
         return $genericResponse;
@@ -1875,7 +1875,15 @@ class UsersController {
     /** AI Assistant with rate limiting
      */
     public function AIAssistant($params) {
-        $message = $params['data']['message'] ?? '';
+        // The mobile app sends "prompt"; older clients send "message".
+        $message = trim((string) ($params['data']['prompt'] ?? $params['data']['message'] ?? ''));
+
+        if (!defined('OPENAI_API_KEY') || OPENAI_API_KEY === '') {
+            return ['reply' => "The AI assistant isn't available right now."];
+        }
+        if ($message === '' || mb_strlen($message) > 2000) {
+            return ['reply' => 'Please type a question (up to 2000 characters).'];
+        }
 
         // Each message costs money on the OpenAI account, so cap it per user per day.
         if (RateLimiter::attempt('ai:' . AuthHelper::id(), 20, 86400)) {
@@ -1973,7 +1981,7 @@ class UsersController {
             ]);
     
             // verification link
-            $link = "https://ojt-track.kamsite.com/verify-email?token=" . $token;
+            $link = rtrim(APP_URL, '/') . "/verify-email?token=" . $token;
     
             $mailTemplate = EmailTemplate::emailVerification($user['name'], $link);
             $to = $user['email'];

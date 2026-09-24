@@ -593,4 +593,91 @@ class TraineeController {
         return "Inserted $count attendance records for trainee ID $traineeId.";
     }
 
+    /**
+     * Saves the supervisor's evaluation form from the mobile app.
+     * scores[section][item] = {points: 1-5, remarks}, e.g. scores["1"]["1a"].
+     */
+    public function saveEvaluationV2($params) {
+        $data = $params['data'] ?? [];
+        $traineeId = (int) ($data['traineeId'] ?? $data['trainee_id'] ?? 0);
+        $scores = $data['scores'] ?? null;
+        $supervisorId = (int) AuthHelper::id();
+
+        if (!$traineeId || !is_array($scores) || !$scores) {
+            return ['success' => false, 'message' => 'Missing trainee or scores.'];
+        }
+        if (!AuthHelper::canAccessTrainee($traineeId)) {
+            return ['success' => false, 'message' => 'You can only evaluate your own trainees.'];
+        }
+        if ($this->evaluationExists($traineeId, $supervisorId)) {
+            return ['success' => false, 'message' => 'Evaluation already submitted for this trainee.'];
+        }
+
+        $rows = [];
+        foreach ($scores as $section => $items) {
+            if (!in_array((string) $section, ['1', '2', '3'], true) || !is_array($items)) continue;
+            foreach ($items as $itemId => $item) {
+                if (!preg_match('/^[1-3][a-d]$/', (string) $itemId)) continue;
+                $points = (int) ($item['points'] ?? 0);
+                if ($points < 1 || $points > 5) {
+                    return ['success' => false, 'message' => 'Each score must be from 1 to 5.'];
+                }
+                $remarks = mb_substr(trim((string) ($item['remarks'] ?? '')), 0, 255);
+                $rows[] = [(int) $section, (string) $itemId, $points, $remarks];
+            }
+        }
+        if (count($rows) !== 12) {
+            return ['success' => false, 'message' => 'Please score all 12 items.'];
+        }
+
+        try {
+            $this->conn->beginTransaction();
+            $stmt = $this->conn->prepare(
+                "INSERT INTO trainee_evaluationsV2 (trainee_id, supervisor_id, evaluation_id, item_id, points, remarks)
+                 VALUES (?, ?, ?, ?, ?, ?)"
+            );
+            foreach ($rows as [$section, $itemId, $points, $remarks]) {
+                $stmt->execute([$traineeId, $supervisorId, $section, $itemId, $points, $remarks]);
+            }
+            $this->conn->commit();
+        } catch (Exception $e) {
+            $this->conn->rollBack();
+            return ['success' => false, 'message' => safeError($e)];
+        }
+
+        return ['success' => true, 'message' => 'Evaluation saved successfully.'];
+    }
+
+    /** GET trainee/checkEvaluationExists?traineeId=… : whether this supervisor already evaluated the trainee. */
+    public function checkEvaluationExists($params) {
+        $traineeId = (int) ($params['traineeId'] ?? $params['data']['traineeId'] ?? 0);
+        return ['exists' => $traineeId > 0 && $this->evaluationExists($traineeId, (int) AuthHelper::id())];
+    }
+
+    private function evaluationExists(int $traineeId, int $supervisorId): bool {
+        $stmt = $this->conn->prepare(
+            "SELECT 1 FROM trainee_evaluationsV2 WHERE trainee_id = ? AND supervisor_id = ? LIMIT 1"
+        );
+        $stmt->execute([$traineeId, $supervisorId]);
+        return (bool) $stmt->fetchColumn();
+    }
+
+    /** Supervisor removes one of their trainees; the trainee can then request a new supervisor. */
+    public function unEnrollTrainee($params) {
+        $traineeId = (int) ($params['data']['trainee_id'] ?? 0);
+        $supervisorId = (int) AuthHelper::id();
+
+        $stmt = $this->conn->prepare("DELETE FROM supervisor_trainees WHERE trainee_id = ? AND supervisor_id = ?");
+        $stmt->execute([$traineeId, $supervisorId]);
+        if ($stmt->rowCount() === 0) {
+            return ['success' => false, 'error' => 'Trainee not found in your list.'];
+        }
+
+        // Close their accepted request so they can send a new one.
+        $this->conn->prepare(
+            "UPDATE student_supervisor_requests SET status = 2 WHERE user_id = ? AND supervisor_id = ? AND status = 1"
+        )->execute([$traineeId, $supervisorId]);
+
+        return ['success' => true, 'message' => 'Trainee removed.'];
+    }
 }

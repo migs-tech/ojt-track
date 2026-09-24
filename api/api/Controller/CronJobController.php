@@ -350,7 +350,7 @@ class CronJobController {
                             ]
                         );
 
-                        if ($sendMail) {
+                        if (!empty($sendMail['success'])) {
                             $this->notification->sendNotificationByUserId(
                                 $user['id'],
                                 "Monthly Hours Report Generated",
@@ -436,7 +436,7 @@ class CronJobController {
                             ]
                         );
 
-                        if ($sendMail) {
+                        if (!empty($sendMail['success'])) {
                             $this->notification->sendNotificationByUserId(
                                 $user['id'],
                                 "Weekly Report Generated",
@@ -765,7 +765,7 @@ class CronJobController {
                             'fileNames' => $result['fileName'] ?? null
                         ]);
 
-                        if ($mailSent) {
+                        if (!empty($mailSent['success'])) {
                             $this->notification->sendNotificationByUserId(
                                 $user['id'],
                                 "Weekly Report Generated",

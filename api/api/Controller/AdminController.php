@@ -12,77 +12,139 @@ class AdminController{
         $this->generate = new GenerateReportController();
     }
     
+    /**
+     * SQL that returns each trainee's worked seconds from completed attendance (time in + time out).
+     * Columns: trainee_id, worked_seconds
+     */
+    private function workedSecondsSql(): string {
+        return "SELECT trainee_id,
+                       SUM(TIMESTAMPDIFF(SECOND, time_in, time_out)) AS worked_seconds
+                FROM trainee_attendance
+                WHERE status = 1 AND time_in IS NOT NULL AND time_out IS NOT NULL
+                GROUP BY trainee_id";
+    }
+
+    private static function completionPercent($workedSeconds, $requiredHours): int {
+        $required = (int) $requiredHours ?: 486;
+        return (int) min(100, round(((int) $workedSeconds / 3600) / $required * 100));
+    }
+
+    private static function pagination(int $total, int $page, int $limit): array {
+        return [
+            'total' => $total,
+            'page' => $page,
+            'limit' => $limit,
+            'totalPages' => $total > 0 ? (int) ceil($total / $limit) : 1,
+        ];
+    }
+
+    /**
+     * Trainees who have a supervisor, with their OJT progress.
+     * Params: page, limit, search (by name)
+     */
     public function getTraineeList($params) {
-        $page = isset($params['data']['page']) ? (int)$params['data']['page'] : 1;
-        $limit = isset($params['data']['limit']) ? (int)$params['data']['limit'] : 10;
+        $page = max(1, (int) ($params['data']['page'] ?? 1));
+        $limit = min(100, max(1, (int) ($params['data']['limit'] ?? 10)));
         $offset = ($page - 1) * $limit;
-    
-        // Count total trainees
-        $countSql = "SELECT COUNT(*) 
-                     FROM users t
-                     INNER JOIN supervisor_trainees st ON t.id = st.trainee_id
-                     INNER JOIN users s ON st.supervisor_id = s.id
-                     WHERE t.role = 1";
-        $countStmt = $this->conn->prepare($countSql);
-        $countStmt->execute();
+        $search = trim((string) ($params['data']['search'] ?? ''));
+
+        $where = "t.role = 1";
+        $args = [];
+        if ($search !== '') {
+            $where .= " AND COALESCE(NULLIF(t.complete_name, ''), t.username) LIKE :search";
+            $args['search'] = '%' . $search . '%';
+        }
+
+        $from = "FROM users t
+                 INNER JOIN supervisor_trainees st ON t.id = st.trainee_id
+                 INNER JOIN users s ON st.supervisor_id = s.id
+                 LEFT JOIN (" . $this->workedSecondsSql() . ") w ON w.trainee_id = t.id
+                 WHERE $where";
+
+        $countStmt = $this->conn->prepare("SELECT COUNT(*) $from");
+        $countStmt->execute($args);
         $total = (int) $countStmt->fetchColumn();
-    
-        // Fetch paginated trainees
-        $sql = "SELECT 
-                    t.id AS trainee_id,
-                    COALESCE(t.complete_name, t.username) AS trainee_name,
-                    t.birthdate,
-                    t.email,
-                    t.avatar_url,
-                    t.ojt_required_hours,
-                    s.id AS supervisor_id,
-                    COALESCE(s.complete_name, s.username) AS supervisor_name
-                FROM users t
-                INNER JOIN supervisor_trainees st ON t.id = st.trainee_id
-                INNER JOIN users s ON st.supervisor_id = s.id
-                WHERE t.role = 1
-                LIMIT :limit OFFSET :offset";
-    
-        $stmt = $this->conn->prepare($sql);
+
+        $stmt = $this->conn->prepare(
+            "SELECT
+                t.id AS trainee_id,
+                COALESCE(NULLIF(t.complete_name, ''), t.username) AS trainee_name,
+                t.birthdate,
+                t.email,
+                t.avatar_url,
+                t.ojt_required_hours,
+                COALESCE(w.worked_seconds, 0) AS worked_seconds,
+                s.id AS supervisor_id,
+                COALESCE(NULLIF(s.complete_name, ''), s.username) AS supervisor_name
+             $from
+             ORDER BY trainee_name
+             LIMIT :limit OFFSET :offset"
+        );
+        foreach ($args as $k => $v) $stmt->bindValue(':' . $k, $v);
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
         $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-        // Calculate pagination
-        $totalPages = $total > 0 ? ceil($total / $limit) : 1;
-    
-        return [
-            'trainees' => $results,
-            'pagination' => [
-                'total' => $total,
-                'page' => $page,
-                'limit' => $limit,
-                'totalPages' => $totalPages
-            ]
-        ];
+
+        foreach ($results as &$row) {
+            $row['ojt_completion_percentage'] = self::completionPercent($row['worked_seconds'], $row['ojt_required_hours']);
+            unset($row['worked_seconds']);
+        }
+
+        return ['trainees' => $results, 'pagination' => self::pagination($total, $page, $limit)];
     }
 
-    
-    public function getSupervisorList(){
-        $sql = "SELECT 
+    /**
+     * Supervisors. Without a page number, returns all of them (used by the assign-supervisor picker).
+     * Params: page, limit, search (by name)
+     */
+    public function getSupervisorList($params = []) {
+        $data = $params['data'] ?? [];
+        $search = trim((string) ($data['search'] ?? ''));
+
+        $where = "role = 2";
+        $args = [];
+        if ($search !== '') {
+            $where .= " AND COALESCE(NULLIF(complete_name, ''), username) LIKE :search";
+            $args['search'] = '%' . $search . '%';
+        }
+
+        $select = "SELECT
                     id AS supervisor_id,
-                    COALESCE(complete_name, username) AS supervisor_name,
+                    COALESCE(NULLIF(complete_name, ''), username) AS supervisor_name,
                     birthdate,
                     email,
+                    company,
                     avatar_url,
                     created,
                     modified
                 FROM users
-                WHERE role = 2";
-    
-        $stmt = $this->conn->prepare($sql);
+                WHERE $where
+                ORDER BY supervisor_name";
+
+        if (empty($data['page'])) {
+            $stmt = $this->conn->prepare($select);
+            $stmt->execute($args);
+            $all = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            return ['supervisors' => $all, 'pagination' => self::pagination(count($all), 1, max(1, count($all)))];
+        }
+
+        $page = max(1, (int) $data['page']);
+        $limit = min(100, max(1, (int) ($data['limit'] ?? 10)));
+
+        $countStmt = $this->conn->prepare("SELECT COUNT(*) FROM users WHERE $where");
+        $countStmt->execute($args);
+        $total = (int) $countStmt->fetchColumn();
+
+        $stmt = $this->conn->prepare($select . " LIMIT :limit OFFSET :offset");
+        foreach ($args as $k => $v) $stmt->bindValue(':' . $k, $v);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', ($page - 1) * $limit, PDO::PARAM_INT);
         $stmt->execute();
-        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-        return $results;
+
+        return ['supervisors' => $stmt->fetchAll(PDO::FETCH_ASSOC), 'pagination' => self::pagination($total, $page, $limit)];
     }
-    
+
     public function getTraineeRequestList(){
         $sql = "SELECT 
                     r.id AS request_id,
@@ -187,16 +249,21 @@ class AdminController{
     }
     
     public function getTraineeDataById($params) {
-        $traineeId = $params['data']['trainee_id'];
+        $traineeId = (int) ($params['data']['trainee_id'] ?? 0);
 
         // Get trainee basic info
         $sql = "SELECT 
                     u.id AS trainee_id,
-                    COALESCE(u.complete_name, u.username) AS trainee_name,
+                    COALESCE(NULLIF(u.complete_name, ''), u.username) AS trainee_name,
+                    u.email,
+                    u.birthdate,
+                    u.course,
+                    u.company,
+                    u.started_at,
                     u.avatar_url,
                     u.ojt_required_hours
                 FROM users u
-                WHERE u.id = :trainee_id";
+                WHERE u.id = :trainee_id AND u.role = 1";
 
         $stmt = $this->conn->prepare($sql);
         $stmt->execute(['trainee_id' => $traineeId]);
@@ -208,7 +275,8 @@ class AdminController{
 
         // Get supervisor name
         $sql = "SELECT 
-                    COALESCE(u.complete_name, u.username) AS supervisor_name
+                    COALESCE(NULLIF(u.complete_name, ''), u.username) AS supervisor_name,
+                    u.company AS supervisor_company
                 FROM supervisor_trainees st
                 INNER JOIN users u ON u.id = st.supervisor_id
                 WHERE st.trainee_id = :trainee_id
@@ -219,6 +287,9 @@ class AdminController{
         $supervisor = $stmt->fetch(PDO::FETCH_ASSOC);
 
         $trainee['supervisor_name'] = $supervisor['supervisor_name'] ?? null;
+        if (empty($trainee['company'])) {
+            $trainee['company'] = $supervisor['supervisor_company'] ?? null;
+        }
 
         // Attendance summary
         $sql = "SELECT status, COUNT(*) AS total,
@@ -254,6 +325,20 @@ class AdminController{
             'absent'      => (int)$totalAbsent,
             'work_hours'  => "{$hours}h {$minutes}m {$seconds}s"
         ];
+
+        // Latest attendance logs
+        $stmt = $this->conn->prepare(
+            "SELECT DATE_FORMAT(date, '%b %e, %Y') AS created_at,
+                    DATE_FORMAT(time_in, '%h:%i %p') AS time_in,
+                    DATE_FORMAT(time_out, '%h:%i %p') AS time_out,
+                    status
+             FROM trainee_attendance
+             WHERE trainee_id = :trainee_id
+             ORDER BY date DESC
+             LIMIT 60"
+        );
+        $stmt->execute(['trainee_id' => $traineeId]);
+        $trainee['attendance_logs'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
         // Reports
         $sql = "SELECT id, user_id, title, date, description, image_url, status, created_at
@@ -877,7 +962,7 @@ class AdminController{
                         unlink($oldFilePath);
                     }
                 }
-                $avatarUrl = BASE_URL . '/api/uploads/profile_images/' . $newFileName;
+                $avatarUrl = $saved['url'];
                 $updateFields['avatar_url'] = $avatarUrl;
                 $updateSqlParts[] = "avatar_url = :avatar_url";
             }
@@ -964,5 +1049,191 @@ class AdminController{
                 'message' => safeError($e)
             ];
         }
+    }
+
+    /**
+     * Evaluations from the mobile app's evaluation form, grouped per trainee:
+     * evaluations[section][item] = {points, remarks}. Sections: 1 Leadership, 2 Attitude, 3 Performance.
+     */
+    public function getEvaluationsTrainee($params = []) {
+        $stmt = $this->conn->prepare(
+            "SELECT e.trainee_id, e.supervisor_id, e.evaluation_id, e.item_id, e.points, e.remarks, e.created_at,
+                    COALESCE(NULLIF(t.complete_name, ''), t.username) AS trainee_name,
+                    COALESCE(NULLIF(s.complete_name, ''), s.username) AS supervisor_name
+             FROM trainee_evaluationsV2 e
+             JOIN users t ON t.id = e.trainee_id
+             JOIN users s ON s.id = e.supervisor_id
+             ORDER BY e.created_at DESC, e.item_id"
+        );
+        $stmt->execute();
+
+        $grouped = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $key = $row['trainee_id'] . '-' . $row['supervisor_id'];
+            if (!isset($grouped[$key])) {
+                $grouped[$key] = [
+                    'trainee_id' => (int) $row['trainee_id'],
+                    'trainee_name' => $row['trainee_name'],
+                    'supervisor_id' => (int) $row['supervisor_id'],
+                    'supervisor_name' => $row['supervisor_name'],
+                    'evaluated_at' => $row['created_at'],
+                    'evaluations' => [],
+                ];
+            }
+            $grouped[$key]['evaluations'][$row['evaluation_id']][$row['item_id']] = [
+                'points' => (int) $row['points'],
+                'remarks' => $row['remarks'],
+            ];
+        }
+
+        return ['success' => true, 'data' => array_values($grouped)];
+    }
+
+    /** Latest evaluations for the dashboard, with the score as a percentage. */
+    public function getRecentEvaluations() {
+        $stmt = $this->conn->prepare(
+            "SELECT COALESCE(NULLIF(s.complete_name, ''), s.username) AS supervisor_name,
+                    COALESCE(NULLIF(t.complete_name, ''), t.username) AS trainee_name,
+                    'Trainee Evaluation' AS evaluation_type,
+                    CONCAT(ROUND(SUM(e.points) / (COUNT(*) * 5) * 100), '%') AS score,
+                    MAX(e.created_at) AS date
+             FROM trainee_evaluationsV2 e
+             JOIN users t ON t.id = e.trainee_id
+             JOIN users s ON s.id = e.supervisor_id
+             GROUP BY e.trainee_id, e.supervisor_id, s.complete_name, s.username, t.complete_name, t.username
+             ORDER BY date DESC
+             LIMIT 10"
+        );
+        $stmt->execute();
+        return ['success' => true, 'recent_evaluations' => $stmt->fetchAll(PDO::FETCH_ASSOC)];
+    }
+
+    /** How many trainees have completed, are in progress, or haven't started their required hours. */
+    public function getOjtHoursCompletionStats() {
+        $stmt = $this->conn->prepare(
+            "SELECT u.ojt_required_hours, COALESCE(w.worked_seconds, 0) AS worked_seconds
+             FROM users u
+             LEFT JOIN (" . $this->workedSecondsSql() . ") w ON w.trainee_id = u.id
+             WHERE u.role = 1"
+        );
+        $stmt->execute();
+
+        $stats = ['completed' => 0, 'in_progress' => 0, 'not_started' => 0];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $percent = self::completionPercent($row['worked_seconds'], $row['ojt_required_hours']);
+            if ((int) $row['worked_seconds'] === 0) {
+                $stats['not_started']++;
+            } elseif ($percent >= 100) {
+                $stats['completed']++;
+            } else {
+                $stats['in_progress']++;
+            }
+        }
+        return ['success' => true, 'data' => $stats];
+    }
+
+    /**
+     * Trainees who have reached their required hours.
+     * Params: page, limit, search (by name)
+     */
+    public function getCompletedOjtTrainees($params) {
+        $page = max(1, (int) ($params['data']['page'] ?? 1));
+        $limit = min(100, max(1, (int) ($params['data']['limit'] ?? 10)));
+        $search = trim((string) ($params['data']['search'] ?? ''));
+
+        $where = "u.role = 1 AND COALESCE(w.worked_seconds, 0) >= COALESCE(NULLIF(u.ojt_required_hours, 0), 486) * 3600";
+        $args = [];
+        if ($search !== '') {
+            $where .= " AND COALESCE(NULLIF(u.complete_name, ''), u.username) LIKE :search";
+            $args['search'] = '%' . $search . '%';
+        }
+        $from = "FROM users u
+                 LEFT JOIN (" . $this->workedSecondsSql() . ") w ON w.trainee_id = u.id
+                 LEFT JOIN supervisor_trainees st ON st.trainee_id = u.id
+                 LEFT JOIN users s ON s.id = st.supervisor_id
+                 WHERE $where";
+
+        $countStmt = $this->conn->prepare("SELECT COUNT(DISTINCT u.id) $from");
+        $countStmt->execute($args);
+        $total = (int) $countStmt->fetchColumn();
+
+        $stmt = $this->conn->prepare(
+            "SELECT u.id AS trainee_id,
+                    COALESCE(NULLIF(u.complete_name, ''), u.username) AS trainee_name,
+                    u.email,
+                    u.avatar_url,
+                    u.ojt_required_hours,
+                    MAX(COALESCE(NULLIF(s.complete_name, ''), s.username)) AS supervisor_name
+             $from
+             GROUP BY u.id, u.complete_name, u.username, u.email, u.avatar_url, u.ojt_required_hours
+             ORDER BY trainee_name
+             LIMIT :limit OFFSET :offset"
+        );
+        foreach ($args as $k => $v) $stmt->bindValue(':' . $k, $v);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', ($page - 1) * $limit, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as &$row) {
+            $row['ojt_completion_percentage'] = 100;
+        }
+        return ['success' => true, 'data' => $rows, 'pagination' => self::pagination($total, $page, $limit)];
+    }
+
+    /** PDF summary of one trainee (profile, attendance and reports) for printing. */
+    public function generateTraineeDetails($params) {
+        $details = $this->getTraineeDataById(['data' => ['trainee_id' => $params['data']['trainee_id'] ?? 0]]);
+        if (empty($details['success'])) {
+            return ['success' => false, 'message' => 'Trainee not found'];
+        }
+        $t = $details['data'];
+        $e = function ($value) {
+            return htmlspecialchars((string) ($value ?? 'N/A'), ENT_QUOTES, 'UTF-8');
+        };
+
+        $pdf = new TCPDF();
+        $pdf->SetCreator('OJT Track');
+        $pdf->SetTitle('Trainee Details - ' . $t['trainee_name']);
+        $pdf->setPrintHeader(false);
+        $pdf->SetMargins(15, 15, 15);
+        $pdf->AddPage();
+        $pdf->SetFont('helvetica', '', 10);
+
+        $html = '<h2>' . $e($t['trainee_name']) . '</h2>
+            <table cellpadding="4">
+                <tr><td><b>Email:</b> ' . $e($t['email']) . '</td><td><b>Course:</b> ' . $e($t['course']) . '</td></tr>
+                <tr><td><b>Company:</b> ' . $e($t['company']) . '</td><td><b>Supervisor:</b> ' . $e($t['supervisor_name']) . '</td></tr>
+                <tr><td><b>Required hours:</b> ' . $e($t['ojt_required_hours']) . '</td><td><b>Work hours:</b> ' . $e($t['attendance']['work_hours']) . '</td></tr>
+                <tr><td><b>Present:</b> ' . (int) $t['attendance']['present'] . '</td><td><b>Absent:</b> ' . (int) $t['attendance']['absent'] . '</td></tr>
+            </table>
+            <h3>Attendance</h3>
+            <table border="1" cellpadding="3"><tr style="background-color:#eeeeee;"><th>Date</th><th>Time in</th><th>Time out</th></tr>';
+        foreach ($t['attendance_logs'] as $log) {
+            $html .= '<tr><td>' . $e($log['created_at']) . '</td><td>' . $e($log['time_in']) . '</td><td>' . $e($log['time_out']) . '</td></tr>';
+        }
+        $html .= '</table><h3>Reports</h3>';
+        foreach ($t['reports'] as $week) {
+            $html .= '<p><b>' . $e($week['week_range']) . '</b></p><ul>';
+            foreach ($week['reports'] as $report) {
+                if (!is_array($report)) continue;
+                $html .= '<li><b>' . $e($report['title']) . '</b> (' . $e($report['date']) . '): ' . $e($report['description']) . '</li>';
+            }
+            $html .= '</ul>';
+        }
+        $pdf->writeHTML($html, true, false, true, false, '');
+
+        $dir = __DIR__ . '/../uploads/trainee_details';
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+        $filePath = $dir . '/' . Storage::randomName('trainee_' . $t['trainee_id'], 'pdf');
+        $pdf->Output($filePath, 'F');
+
+        $url = Storage::publish($filePath, 'application/pdf');
+        if (Storage::usesCloudinary()) {
+            @unlink($filePath);
+        }
+        return ['success' => true, 'url' => $url];
     }
 }

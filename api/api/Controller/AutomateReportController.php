@@ -79,21 +79,6 @@
             }
         }
         
-        $response = [
-            "results" => [
-                "filePath" => "/home/u898315052/domains/ojt.kamsite.com/public_html/api/uploads/daily_time_record_35_09_2025.pdf",
-                "fileName" => "daily_time_record_35_09_2025.pdf",
-            ]
-        ];
-        
-        MailerController::sendEmail(
-            "fdc.kennethroy@gmail.com",
-            "Your Monthly Hours Report",
-            "<p>Hi, please find attached your monthly report.</p>",
-            $response['results']['filePath'],   // absolute path
-            $response['results']['fileName']    // attachment name
-        );
-
         return $results;
     }
     

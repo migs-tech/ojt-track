@@ -148,7 +148,8 @@ class GenerateReportController{
             $counter++;
         }
 
-        $fileName = "Weekly_Report_User{$userId}_{$startDate->format('Ymd')}_to_{$endDate->format('Ymd')}.pdf";
+        // Random suffix: report URLs must not be guessable from the user ID and dates.
+        $fileName = Storage::randomName("Weekly_Report_User{$userId}_{$startDate->format('Ymd')}_to_{$endDate->format('Ymd')}", 'pdf');
         $filePath = __DIR__ . '/../uploads/' . $fileName;
         $pdf->Output($filePath, 'F');
 
@@ -171,7 +172,7 @@ class GenerateReportController{
             'user_name'=> $uname,
             'fileName' => $fileName,
             'filePath' => $filePath,
-            'url'      => BASE_URL . '/api/uploads/' . $fileName,
+            'url'      => Storage::publish($filePath, 'application/pdf'),
             'message'  => "Generated weekly report for {$uname} ({$userId})."
         ];
     }
@@ -505,7 +506,7 @@ class GenerateReportController{
         $pdf->writeHTML($footer, true, false, true, false, '');
 
         // Output PDF
-        $fileName = 'weekly_hours_report_' . $userId . '_' . $startDate->format('Ymd') . '_to_' . $endDate->format('Ymd') . '.pdf';
+        $fileName = Storage::randomName('weekly_hours_report_' . $userId . '_' . $startDate->format('Ymd') . '_to_' . $endDate->format('Ymd'), 'pdf');
 
         //make sure the directory exists
         if (!is_dir(__DIR__ . '/../uploads/weekly_reports')) {
@@ -520,7 +521,7 @@ class GenerateReportController{
             'fileName' => $fileName,
             'success' => true,
             'message' => "Weekly hours report generated successfully for {$uname}",
-            'url'     => BASE_URL . '/api/uploads/weekly_reports/' . $fileName
+            'url'     => Storage::publish($filePath, 'application/pdf')
         ];
 
     }
@@ -704,7 +705,7 @@ HTML;
     $pdf->writeHTML($footer, true, false, true, false, '');
 
     // Output PDF
-    $fileName = 'daily_time_record_' . $userId . '_' . $month . '_' . $year . '.pdf';
+    $fileName = Storage::randomName('daily_time_record_' . $userId . '_' . $month . '_' . $year, 'pdf');
     $filePath = __DIR__ . '/../uploads/' . $fileName;
     $pdf->Output($filePath, 'F');
 
@@ -713,7 +714,7 @@ HTML;
         'fileName' => $fileName,
         'success' => true,
         'message' => "Monthly hours report generated successfully for $monthName, $year",
-        'url'     => BASE_URL . '/api/uploads/' . $fileName
+        'url'     => Storage::publish($filePath, 'application/pdf')
     ];
 }
 

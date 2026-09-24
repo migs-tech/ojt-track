@@ -65,7 +65,7 @@ class SendNotificationController {
                 "body"  => $body,
                 // "channelId" => "funny-channel",
                 "data" => [
-                    'url' => 'https://ojt.kamsite.com'
+                    'url' => APP_URL
                 ]
             ];
 

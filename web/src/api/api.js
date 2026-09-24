@@ -16,8 +16,9 @@ const getEncryptedToken = (key) => {
   }
 };
 
+// Set VITE_API_URL to the API server, e.g. https://ojt-api.onrender.com/api
 const api = axios.create({
-  baseURL: "https://ojt.kamsite.com/api",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8080/api",
 });
 
 // Add a request interceptor to dynamically set the token

@@ -1,0 +1,59 @@
+# Render Blueprint for the OJT Track API.
+# In Render: New > Blueprint > pick this repository. You'll be asked for the values marked `sync: false`.
+services:
+  - type: web
+    name: ojt-track-api
+    runtime: docker
+    plan: free
+    region: singapore
+    rootDir: api
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # Database (TiDB Cloud: Connect > "General" connection details)
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "4000"
+      - key: DB_USER
+        sync: false
+      - key: DB_PASS
+        sync: false
+      - key: DB_NAME
+        value: ojt
+      - key: DB_SSL_CA
+        value: /etc/ssl/certs/ca-certificates.crt
+
+      # Public addresses
+      - key: BASE_URL          # this API, e.g. https://ojt-track-api.onrender.com
+        sync: false
+      - key: APP_URL           # the web app on Vercel, e.g. https://ojt-track.vercel.app
+        sync: false
+      - key: ALLOWED_ORIGINS   # usually the same as APP_URL
+        sync: false
+
+      # File storage (Cloudinary dashboard > API Keys > "API environment variable")
+      - key: CLOUDINARY_URL
+        sync: false
+
+      # Email (Brevo > SMTP & API > API keys). Sender must be a verified sender in Brevo.
+      - key: BREVO_API_KEY
+        sync: false
+      - key: MAIL_FROM_EMAIL
+        sync: false
+      - key: MAIL_FROM_NAME
+        value: OJT Track
+
+      # Security
+      - key: CRON_SECRET
+        generateValue: true
+      - key: RECAPTCHA_SECRET_KEY
+        sync: false
+      - key: TOKEN_TTL_DAYS
+        value: "30"
+
+      # Optional: AI report summaries and assistant (leave empty to turn off)
+      - key: OPENAI_API_KEY
+        sync: false

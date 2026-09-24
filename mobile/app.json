@@ -20,7 +20,7 @@
       "permissions": [
         "android.permission.CAMERA"
       ],
-      "package": "com.kenethroydev.OjtTrack",
+      "package": "com.migstech.ojttrack",
       "googleServicesFile": "./google-services.json"
     },
     "web": {
@@ -64,10 +64,7 @@
       "typedRoutes": true
     },
     "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "2349a8f4-ecb7-45ef-b6e3-a394209b2c4c"
-      }
+      "router": {}
     }
   }
 }

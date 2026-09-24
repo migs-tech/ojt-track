@@ -43,10 +43,14 @@ ojt-track/
 └── database/   # schema.sql: table structure only, no data
 ```
 
+## Deploying
+
+See [DEPLOY.md](DEPLOY.md) for free hosting on TiDB Cloud, Render, Vercel, Cloudinary and Brevo.
+
 ## Getting started
 
 ### 1. Database
-Create a MySQL/MariaDB database called `ojt`, then import `database/schema.sql` followed by `database/migrations/001_security.sql`.
+Create a MySQL/MariaDB (or TiDB) database called `ojt` and import `database/schema.sql`. To upgrade a database made from an older schema, run `database/migrations/001_security.sql` instead.
 
 ### 2. API
 ```bash

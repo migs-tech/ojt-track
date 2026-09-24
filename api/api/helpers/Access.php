@@ -76,6 +76,9 @@ class Access {
             'updateTraineeRequest'    => [self::SUPERVISOR],
             'getTraineeLatestReport'  => [self::SUPERVISOR],
             'saveTraineeEvaluation'   => [self::SUPERVISOR],
+            'saveEvaluationV2'        => [self::SUPERVISOR],
+            'checkEvaluationExists'   => [self::SUPERVISOR],
+            'unEnrollTrainee'         => [self::SUPERVISOR],
             'insertAttendanceForTrainee' => 'cron',
         ],
         'attendance' => [
@@ -108,9 +111,9 @@ class Access {
             'generateTraineeWeeklyAccomplishmentReport' => self::STAFF,
             'getReportRequest'        => self::STAFF,
             'updateReportRequestStatus' => self::STAFF,
-            'getAllEvaluations'       => self::STAFF,
             'getRecentEvaluations'    => self::STAFF,
             'getOjtHoursCompletionStats' => self::STAFF,
+            'getEvaluationsTrainee'   => self::STAFF,
             'getCompletedOjtTrainees' => self::STAFF,
             'generateTraineeDetails'  => self::STAFF,
             'getTeacherList'          => [self::ADMIN],
@@ -136,10 +139,7 @@ class Access {
             'runWeeklyReportReminder'         => 'cron',
             'runWeeklyReportsAndHours'        => 'cron',
         ],
-        'cron_job' => [
-            'generatePdf'                     => 'cron',
-            'runAutoGenerateMonthlyHoursReport' => 'cron',
-        ],
+        // 'cron_job' (AutomateReportController) is old test code and is not exposed.
     ];
 
     /** Returns the rule for a route, or null if the route is not exposed. */

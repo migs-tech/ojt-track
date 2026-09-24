@@ -1,0 +1,9 @@
+vendor/
+api/config.php
+api/uploads/*
+!api/uploads/.htaccess
+api/logs/
+logs/
+*.log
+.DS_Store
+dev-router.php

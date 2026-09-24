@@ -218,7 +218,7 @@ class EmailTemplate {
                                     <tbody>
                                         <tr>
                                           <td style='padding:48px 0 30px 0; text-align: center;'>
-                                            <img src='https://ojt.kamsite.com/api/uploads/systemFiles/logo.png' 
+                                            <img src='" . htmlspecialchars(rtrim(APP_URL, '/') . "/icon.png", ENT_QUOTES) . "' 
                                                  alt='Company Logo' 
                                                  style='width: 100px; height: 100px; border-radius: 50%; object-fit: cover;'>
                                           </td>

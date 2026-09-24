@@ -262,7 +262,8 @@ const errorMessage = ref("");
 const token = ref("");
 const captchaLoading = ref(true);
 
-const siteKey = "6Lf5U-grAAAAADVVBh1BOtBQNH7kLnfNoe45COyp";
+// reCAPTCHA v2 site key for your domain (set VITE_RECAPTCHA_SITE_KEY)
+const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || "";
 let widgetId = null;
 
 // Wait until reCAPTCHA script is available
@@ -282,6 +283,11 @@ const waitForGrecaptcha = () => {
 // Initialize reCAPTCHA once script is ready
 onMounted(async () => {
     // reCAPTCHA is tied to the production domain, so the demo skips it.
+    if (!isDemo && !siteKey) {
+        captchaLoading.value = false;
+        token.value = "not-configured";
+        return;
+    }
     if (isDemo) {
         email.value = demoCredentials.username;
         password.value = demoCredentials.password;

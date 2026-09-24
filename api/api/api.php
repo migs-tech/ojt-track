@@ -50,6 +50,11 @@ if ($queryString) {
     parse_str($queryString, $queryParams);
 }
 
+// Health check for the host and keep-awake pings: GET /api/health
+if ($path === 'health') {
+    sendJsonResponse(['ok' => true, 'time' => date('c')]);
+}
+
 $segments = explode('/', $path);
 $controllerName = $segments[0] ?? '';
 $methodName = $segments[1] ?? null;

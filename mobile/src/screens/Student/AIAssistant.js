@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useAuth } from "@/store/useAuthStore";
+import api from "@/lib/api";
 
 const TypingDots = () => {
   const dot1 = useRef(new Animated.Value(0)).current;
@@ -143,16 +144,9 @@ useEffect(() => {
     console.log("Token:", token);
 
     try {
-      const response = await fetch("https://ojt.kamsite.com/api/ai/AIConversation", {
-        method: "POST",
-        headers: {
-           "Content-Type": "application/json",
-           "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({ prompt: input }),
+      const { data } = await api.post("/user/AIAssistant", { prompt: input }, {
+        headers: { "Content-Type": "application/json" },
       });
-
-      const data = await response.json();
       const aiResponse = {
         id: Date.now().toString(),
         text: data.reply || "Sorry, I couldn’t respond.",

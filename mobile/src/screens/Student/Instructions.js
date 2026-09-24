@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import { View, Animated, Easing } from "react-native";
 import { WebView } from "react-native-webview";
+import { WEB_URL } from "@/lib/api";
 
 export default function Instructions() {
   const webviewRef = useRef(null);
@@ -54,7 +55,7 @@ export default function Instructions() {
 
       <WebView
         ref={webviewRef}
-        source={{ uri: "https://ojt-track.kamsite.com/trainee-instructions" }}
+        source={{ uri: `${WEB_URL}/trainee-instructions` }}
         style={{ flex: 1 }}
         onLoadStart={startLoading}
         onLoadEnd={finishLoading}

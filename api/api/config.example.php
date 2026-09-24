@@ -41,3 +41,7 @@ define('CRON_SECRET', '');
 define('TOKEN_TTL_DAYS', 30);
 // Path to a CA certificate bundle to use TLS for the database (e.g. TiDB Cloud); empty = off
 define('DB_SSL_CA', '');
+// Public URL of the web app (used in email links and the email logo)
+define('APP_URL', 'http://localhost:5173');
+// Send email through Brevo's HTTP API instead of SMTP (leave empty to use SMTP)
+define('BREVO_API_KEY', '');
