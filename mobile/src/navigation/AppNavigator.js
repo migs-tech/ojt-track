@@ -7,8 +7,7 @@ import { checkFirstInstall } from '@/utils/checkFirstInstall';
 import LoginScreen from '@/screens/Auth/LoginScreen';
 import StudentStack from './StudentStack';
 import TeacherStack from './TeacherStack';
-import GetStartedScreen from '@/screens/Onboarding/GetStartedScreen';
-import TraineeSignUp from '@/screens/Auth/TraineeSignUp';  
+  
 import SupervisorSignUp from '@/screens/Auth/SupervisorSignUp';
 import SignUpRoleScreen from '@/screens/Auth/RoleScreen';
 import ForgotPasswordScreen from '@/screens/Auth/ForgotPasswordScreen'
@@ -19,13 +18,15 @@ import {useNotificationStore} from "@/store/useNotificationStore";
 
 import {
   ActivityIndicator,
+  Image,
+  Text,
   View,
 } from "react-native";
 
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
-  const { user, role, loading, checkLogin } = useAuth();
+  const { user, role, ready, checkLogin } = useAuth();
   const [firstInstall, setFirstInstall] = useState(null);
   const { register } = useNotificationStore();
 
@@ -43,10 +44,16 @@ export default function AppNavigator() {
     }
   }, [user]);
 
-  if (firstInstall === null) {
+  // Wait for the saved login and onboarding flag, so the login screen doesn't flash
+  if (firstInstall === null || !ready) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#da1d1dff" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#2a5298' }}>
+        <Image
+          source={require('../../assets/images/icon.png')}
+          style={{ width: 96, height: 96, borderRadius: 24, marginBottom: 16 }}
+        />
+        <Text style={{ color: '#fff', fontSize: 22, fontWeight: '700', marginBottom: 24 }}>OJT Track</Text>
+        <ActivityIndicator size="large" color="#fff" />
       </View>
     );
   }
@@ -58,7 +65,6 @@ export default function AppNavigator() {
            <>
             <Stack.Screen name="RoleSelection">
               {(props) => (
-                // <GetStartedScreen {...props} setFirstInstall={setFirstInstall} />
                 <RoleSelectScreen {...props} setFirstInstall={setFirstInstall} />
               )}
             </Stack.Screen>
@@ -78,7 +84,6 @@ export default function AppNavigator() {
           <>
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="SignUpRoleScreen" component={SignUpRoleScreen} />
-            <Stack.Screen name="TraineeSignUp" component={TraineeSignUp} />
             <Stack.Screen name="SupervisorSignUp" component={SupervisorSignUp} />
             <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
             <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />

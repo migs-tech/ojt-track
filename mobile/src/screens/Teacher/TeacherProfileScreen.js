@@ -12,6 +12,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "expo-router";
 import { useAuth } from "@/store/useAuthStore";
+import Constants from "expo-constants";
+import Avatar from "@/components/Avatar";
 
 export default function TeacherProfileScreen() {
   const [logoutVisible, setLogoutVisible] = useState(false);
@@ -39,10 +41,7 @@ export default function TeacherProfileScreen() {
         <View style={styles.header}>
           {/* Left Avatar */}
           <View style={styles.avatar}>
-            <Image
-              source={{ uri: profile?.avatar_url || 'https://www.gravatar.com/avatar/placeholder' }}
-              style={styles.avatarImage}
-            />
+            <Avatar uri={profile?.avatar_url} name={profile?.complete_name || profile?.username} size={60} />
           </View>
 
           {/* Right User Info */}
@@ -97,6 +96,9 @@ export default function TeacherProfileScreen() {
             onPress={() => setLogoutVisible(true)}
           />
         </View>
+        <Text style={{ textAlign: "center", color: "#94a3b8", fontSize: 12, marginVertical: 20 }}>
+          OJT Track v{Constants.expoConfig?.version ?? ""}
+        </Text>
       </ScrollView>
 
       {/* Logout Confirmation Modal */}

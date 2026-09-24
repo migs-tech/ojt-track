@@ -66,13 +66,10 @@ const useTraineeStore = create((set) => ({
         }
     },
 
+    // Returns the server's answer ({ success, message }) so the screen can show it
     recordAttendance: async ({ studentId, status }) => {
         const data = { student_id: studentId, status };
-        try {
-            const result = await recordAttendance(data);
-        } catch (error) {
-            console.error("Error recording attendance:", error);
-        }
+        return recordAttendance(data);
     },
 
     getTraineeDataById: async (id) => {

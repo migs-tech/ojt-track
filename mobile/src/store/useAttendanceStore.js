@@ -1,25 +1,37 @@
-import { Alert } from 'react-native';
 import { create } from 'zustand';
-import { 
+import {
     fetchTotalHours,
+    getAttendanceByUserId,
  } from '@/api/studentApi';
- import { 
+ import {
     getAttendanceRecordToday,
  } from '@/api/teacherApi';
 
 export const useAttendanceStore = create((set) => ({
   totalHours: 0,
   attendanceRecordToday: [],
+  // The trainee's own attendance: { total_hours, days_count, records: [...], today }
+  myAttendance: null,
   loading: false,
     error: null,
 
-    fetchTotalHours: async () => { 
+    fetchTotalHours: async () => {
         set({ loading: true, error: null });
         try {
             const response = await fetchTotalHours();
             set({ totalHours: response.total_hours, loading: false });
         } catch (error) {
             set({ loading: false, error: error.message });
+        }
+    },
+
+    fetchMyAttendance: async () => {
+        try {
+            const response = await getAttendanceByUserId();
+            set({ myAttendance: response, totalHours: response?.total_hours ?? 0 });
+            return response;
+        } catch (error) {
+            return null;
         }
     },
 

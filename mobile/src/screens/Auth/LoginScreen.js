@@ -15,7 +15,7 @@ import {
   ScrollView,
 } from 'react-native';
 import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/secureStore';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function LoginScreen() {
@@ -32,13 +32,16 @@ export default function LoginScreen() {
   const [passwordError, setPasswordError] = React.useState('');
   const [loginError, setLoginError] = React.useState('');
 
+  const [slowHint, setSlowHint] = React.useState(false);
+
+  // Only the username is remembered; passwords are never stored on the phone.
   React.useEffect(() => {
     const loadCredentials = async () => {
       const rememberedEmail = await SecureStore.getItemAsync('rememberedEmail');
-      const rememberedPassword = await SecureStore.getItemAsync('rememberedPassword');
-      if (rememberedEmail && rememberedPassword) {
+      // Remove passwords saved by older versions of the app
+      await SecureStore.deleteItemAsync('rememberedPassword');
+      if (rememberedEmail) {
         setUsername(rememberedEmail);
-        setPassword(rememberedPassword);
         setRememberMe(true);
       }
     };
@@ -61,19 +64,21 @@ export default function LoginScreen() {
     }
     if (!valid) return;
 
+    // The free server can take up to a minute to wake up; say so instead of looking stuck.
+    const slowTimer = setTimeout(() => setSlowHint(true), 6000);
     try {
       setLoading(true);
-      const result = await login(username, password);
       if (rememberMe) {
-        await SecureStore.setItemAsync('rememberedEmail', username);
-        await SecureStore.setItemAsync('rememberedPassword', password);
+        await SecureStore.setItemAsync('rememberedEmail', username.trim());
       } else {
         await SecureStore.deleteItemAsync('rememberedEmail');
-        await SecureStore.deleteItemAsync('rememberedPassword');
       }
+      await login(username, password);
     } catch (error) {
-      setLoginError(error.error);
+      setLoginError(error?.message || 'Sign-in failed. Please try again.');
     } finally {
+      clearTimeout(slowTimer);
+      setSlowHint(false);
       setLoading(false);
     }
   };
@@ -196,7 +201,7 @@ export default function LoginScreen() {
                   <Feather name="check" size={14} color="#fff" />
                 )}
               </View>
-              <Text style={styles.rememberText}>Remember me</Text>
+              <Text style={styles.rememberText}>Remember username</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
               <Text style={styles.forgotText}>Forgot password?</Text>
@@ -226,6 +231,11 @@ export default function LoginScreen() {
               )}
             </LinearGradient>
           </TouchableOpacity>
+          {slowHint ? (
+            <Text style={{ textAlign: 'center', color: '#64748b', fontSize: 13, marginTop: 10 }}>
+              Waking up the server, this can take up to a minute…
+            </Text>
+          ) : null}
 
           {/* Divider */}
           <View style={styles.divider}>

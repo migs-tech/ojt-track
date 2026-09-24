@@ -18,9 +18,10 @@ export const useSupervisorStore = create((set) => ({
         set({ loading: true, error: null });
         try {
             const response = await fetchSupervisorDetails();
-            set({ supervisors: response.supervisors, loading: false });
+            set({ supervisors: response?.supervisors || [], loading: false });
         } catch (error) {
-            set({ loading: false, error: error.message });
+            // Show "no supervisors" instead of loading forever
+            set({ supervisors: [], loading: false, error: error.message });
         }
     },
 

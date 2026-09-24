@@ -13,6 +13,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "expo-router";
 import { useAuth } from "@/store/useAuthStore";
 import useTraineeStore  from '@/store/useTraineeStore';
+import Constants from "expo-constants";
+import Avatar from "@/components/Avatar";
 
 export default function StudentProfileScreen() {
   const [logoutVisible, setLogoutVisible] = useState(false);
@@ -38,18 +40,19 @@ export default function StudentProfileScreen() {
   return (
     <View style={styles.container}>
       <ScrollView>
-        {/* <View style={styles.header}>
-          <View style={styles.avatar}>
-            <Image
-              source={{ uri: profile?.avatar_url || 'https://www.gravatar.com/avatar/placeholder' }}
-              style={styles.avatarImage}
-            />
+        {/* Who is signed in */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: "#fff", padding: 18 }}>
+          <Avatar uri={profile?.avatar_url} name={profile?.complete_name || profile?.username} size={60} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 18, fontWeight: "700", color: "#0f172a" }}>{profile?.complete_name || profile?.username || "Trainee"}</Text>
+            {profile?.email ? <Text style={{ color: "#64748b", marginTop: 2 }}>{profile.email}</Text> : null}
+            {profile?.course || profile?.company ? (
+              <Text style={{ color: "#64748b", marginTop: 2 }} numberOfLines={1}>
+                {[profile.course, profile.company].filter(Boolean).join(" · ")}
+              </Text>
+            ) : null}
           </View>
-          <View style={styles.userInfo}>
-            <Text style={styles.name}>{profile?.complete_name || "Unknown"}</Text>
-            <Text style={styles.email}>{profile?.email || "N/A"}</Text>
-          </View>
-        </View> */}
+        </View>
 
         {/* Menu Items */}
         <View style={styles.menu}>
@@ -98,12 +101,7 @@ export default function StudentProfileScreen() {
             label="Email Verification"
             onPress={() => navigation.navigate("EmailVerification")}
           />
-          {/* Wallet */}
-          {/* <MenuItem
-            icon={<Ionicons name="wallet-outline" size={20} color="#0057ff" />}
-            label="Wallet"
-            onPress={() => navigation.navigate("Wallet")}
-          /> */}
+
           {/*request */}
           <MenuItem
             icon={<Ionicons name="document-text-outline" size={20} color="#0057ff" />}
@@ -128,6 +126,9 @@ export default function StudentProfileScreen() {
             onPress={() => setLogoutVisible(true)}
           />
         </View>
+        <Text style={{ textAlign: "center", color: "#94a3b8", fontSize: 12, marginVertical: 20 }}>
+          OJT Track v{Constants.expoConfig?.version ?? ""}
+        </Text>
       </ScrollView>
 
       {/* Logout Confirmation Modal */}

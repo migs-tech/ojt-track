@@ -1,22 +1,22 @@
 // src/utils/checkFirstInstall.js
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Set once the welcome screens have been shown. (Reading and writing used different keys
+// before, so the welcome screens appeared on every launch.)
+const ONBOARDING_KEY = 'onboardingDone';
+
 export const checkFirstInstall = async () => {
   try {
-    const isFirstLaunch = await AsyncStorage.getItem('alreadyLaunched3');
-    if (isFirstLaunch === null) {
-      return true; 
-    }
-    return false;
+    return (await AsyncStorage.getItem(ONBOARDING_KEY)) === null;
   } catch (error) {
     return false;
   }
 };
 
-//save first install status
+// Save that the welcome screens were shown
 export const saveFirstInstall = async () => {
   try {
-    await AsyncStorage.setItem('alreadyLaunched2', 'true');
+    await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
   } catch (error) {
   }
 };

@@ -1,5 +1,6 @@
 // src/screens/Supervisor/TraineeDetailsScreen.js
 import React, { useState, useEffect } from "react";
+import Avatar from "@/components/Avatar";
 import {
   View,
   Text,
@@ -88,17 +89,15 @@ export default function TraineeDetailsScreen({ route }) {
           >
             <View style={styles.profileRow}>
               <View style={styles.profileLeft}>
-                <Image
-                  source={{
-                    uri:
-                      traineeData?.trainee?.avatar_url ||
-                      "https://randomuser.me/api/portraits/men/32.jpg",
-                  }}
+                <Avatar
+                  uri={traineeData?.trainee?.avatar_url}
+                  name={traineeData?.trainee?.trainee_name}
+                  size={56}
                   style={styles.profileImage}
                 />
                 <View style={styles.profileInfo}>
                   <Text style={styles.name}>
-                    {traineeData?.trainee?.trainee_name || "John Doe"}
+                    {traineeData?.trainee?.trainee_name || "Trainee"}
                   </Text>
                   <Text style={styles.email}>
                     {traineeData?.trainee?.email || "johndoe@email.com"}

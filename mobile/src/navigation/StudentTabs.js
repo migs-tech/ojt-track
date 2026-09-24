@@ -14,6 +14,7 @@ import { useAuth } from "@/store/useAuthStore";
 import EmailCheckModal from '@/components/EmailCheckModal';
 import { useNavigation } from '@react-navigation/native';
 import useTraineeStore  from '@/store/useTraineeStore';
+import Avatar from '@/components/Avatar';
 
 const Tab = createBottomTabNavigator();
 function CustomHeader() {
@@ -42,8 +43,10 @@ function CustomHeader() {
     return (
     <View style={styles.container}>
       <View style={styles.row}>
-        <Image
-          source={{ uri: displayData?.avatar_url || 'https://static.vecteezy.com/system/resources/previews/037/336/395/non_2x/user-profile-flat-illustration-avatar-person-icon-gender-neutral-silhouette-profile-picture-free-vector.jpg' }}
+        <Avatar
+          uri={displayData?.avatar_url}
+          name={displayData?.complete_name || displayData?.username}
+          size={40}
           style={styles.avatar}
         />
         <View style={styles.textContainer}>

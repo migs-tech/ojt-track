@@ -13,6 +13,7 @@ import Icon from "react-native-vector-icons/Ionicons";
 import * as ImagePicker from "expo-image-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useAuth } from "@/store/useAuthStore";
+import Avatar from "@/components/Avatar";
 
 export default function EditProfileScreen() {
   const { profile, getUserProfile, updateUserProfile, user } = useAuth();
@@ -109,15 +110,7 @@ export default function EditProfileScreen() {
       <ScrollView>
         {/* Profile Photo */}
         <View style={styles.profilePicContainer}>
-          <Image
-            source={{
-              uri:
-                file?.uri ||
-                profileImage ||
-                "https://static.vecteezy.com/system/resources/previews/037/336/395/non_2x/user-profile-flat-illustration-avatar-person-icon-gender-neutral-silhouette-profile-picture-free-vector.jpg",
-            }}
-            style={styles.profilePic}
-          />
+          <Avatar uri={file?.uri || profileImage} name={name} size={100} style={styles.profilePic} />
           <TouchableOpacity onPress={pickImage}>
             <Text style={styles.changePhoto}>
               {profileImage ? "Change photo" : "Add photo"}

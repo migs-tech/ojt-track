@@ -224,9 +224,9 @@ export default function SupervisorSignUp({ navigation, route }) {
 
     setLoading(true);
     const data = {
-      username: formData.username,
+      username: formData.username.trim(),
       password: formData.password,
-      email: formData.email,
+      email: formData.email.trim(),
       course: formData.course,
       started_at: formData.started_at,
       company: formData.company,

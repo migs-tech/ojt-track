@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import api from '@/lib/api';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/secureStore';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -55,10 +55,13 @@ export const useNotificationStore = create((set, get) => ({
       }
     }
 
-    // ✅ Listener for incoming notifications
-    Notifications.addNotificationReceivedListener(notification => {
-      console.log("Notification received:", notification);
-    });
+    // Refresh the list and badge when a push notification arrives
+    if (!get().listening) {
+      set({ listening: true });
+      Notifications.addNotificationReceivedListener(() => {
+        get().getNotification();
+      });
+    }
   },
 
   getNotification: async () => {
@@ -76,12 +79,11 @@ export const useNotificationStore = create((set, get) => ({
   },
 
   deleteNotificationById: async (id) => {
-    console.log("Deleting notification ID:", id);
     try {
       const response = await api.post('/notification/deleteNotification', { id });
       if (response.data.success) {
         const updatedNotifications = (get().notifications || []).filter(n => n.id !== id);
-        const updatedUnreadCount = updatedNotifications.filter(n => n.is_read === 0).length || null;
+        const updatedUnreadCount = updatedNotifications.filter(n => !Number(n.is_read)).length || null;
         set({ notifications: updatedNotifications, unreadCount: updatedUnreadCount });
       }
     } catch (error) {
@@ -89,15 +91,26 @@ export const useNotificationStore = create((set, get) => ({
     }
   },
 
+  // Marks every unread notification as read
+  markAllAsRead: async () => {
+    const unread = (get().notifications || []).filter((n) => !Number(n.is_read));
+    set({
+      notifications: (get().notifications || []).map((n) => ({ ...n, is_read: 1 })),
+      unreadCount: null,
+    });
+    await Promise.all(
+      unread.map((n) => api.post('/notification/markNotificationRead', { id: n.id }).catch(() => null))
+    );
+  },
+
   markAsReadById: async (id) => {
-    console.log("Marking as read ID:", id);
     try {
       const response = await api.post('/notification/markNotificationRead', { id });
       if (response.data.success) {
         const updatedNotifications = (get().notifications || []).map(n => 
           n.id === id ? { ...n, is_read: 1 } : n
         );
-        const updatedUnreadCount = updatedNotifications.filter(n => n.is_read === 0).length || null;
+        const updatedUnreadCount = updatedNotifications.filter(n => !Number(n.is_read)).length || null;
         set({ notifications: updatedNotifications, unreadCount: updatedUnreadCount });
       }
     } catch (error) {

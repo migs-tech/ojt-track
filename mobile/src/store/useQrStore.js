@@ -8,122 +8,66 @@ import { create } from 'zustand';
  * @property {string} expires_at
  */
 
-/**
- * @typedef {Object} QrState
- * @property {QrObject|null} qrData
- * @property {string} status
- * @property {boolean} loading
- * @property {() => Promise<void>} fetchQrCode
- * @property {() => Promise<void>} generateQrCode
- * @property {() => Promise<void>} regenerateQrCode
- * @property {() => Promise<void>} refreshQrStatus
- */
+// The server sends "YYYY-MM-DD HH:MM:SS" (Manila time); make it parseable on every phone.
+const parseTime = (value) => (value ? new Date(String(value).replace(' ', 'T')) : null);
+
+const toState = (qr) => {
+  if (!qr?.qr_code) return { qrData: null, status: '' };
+  const isUsed = Number(qr.is_used);
+  const expires = parseTime(qr.expires_at);
+  return {
+    qrData: { qr: qr.qr_code, is_used: isUsed, expires_at: qr.expires_at },
+    status: isUsed === 1 ? 'used' : expires && expires < new Date() ? 'expired' : 'active',
+  };
+};
 
 export const useQrStore = create((set) => ({
+  /** @type {QrObject|null} */
   qrData: null,
   status: '',
   loading: false,
 
+  // Today's latest QR code, if there is one
   fetchQrCode: async () => {
-    set({ loading: true });
     try {
-      const res = await api.post('/user/fetchOrGenerateQrCode');  
-      const qr = res.data?.qr;
-      if (!qr) {
-        set({ qrData: null, status: "" });
-        return;
-      }
-      set({
-        qrData: {
-          qr: qr?.qr_code,
-          is_used: qr?.is_used,
-          expires_at: qr?.expires_at,
-        },
-        status: qr?.is_used
-          ? 'used'
-          : new Date(qr?.expires_at) < new Date()
-          ? 'expired'
-          : 'active',
-      });
+      const res = await api.post('/user/fetchOrGenerateQrCode');
+      set(toState(res.data?.qr));
     } catch (error) {
       console.error('Fetch QR error:', error);
-    } finally {
-      set({ loading: false });
     }
   },
 
+  // Makes a QR code after the emailed code was verified. Returns the server's answer.
   generateQrCode: async () => {
     set({ loading: true });
     try {
       const res = await api.post('/user/generateQRCode');
-      const qr = res.data.qr;
-      set({
-        qrData: {
-          qr: qr.qr_code,
-          is_used: qr.is_used,
-          expires_at: qr.expires_at,
-        },
-        status: qr.is_used
-          ? 'used'
-          : new Date(qr.expires_at) < new Date()
-          ? 'expired'
-          : 'active',
-      });
+      if (res.data?.qr) set(toState(res.data.qr));
+      return res.data;
     } catch (error) {
       console.error('Generate QR error:', error);
+      return { success: false };
     } finally {
       set({ loading: false });
     }
   },
 
-  regenerateQrCode: async () => {
-    set({ loading: true });
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-    try {
-      const res = await api.post('/user/regenerateQrCode');
-      const qr = res.data.qr;
-      set({
-        qrData: {
-          qr: qr.qr_code,
-          is_used: qr.is_used,
-          expires_at: qr.expires_at,
-        },
-        status: res.data.status,
-      });
-    } catch (error) {
-      console.error('Regenerate QR error:', error);
-    } finally {
-      set({ loading: false });
-    }
-  },
-
+  // Polled while the QR is on screen, to see when the supervisor scans it
   refreshQrStatus: async () => {
-    set({ loading: false });
     try {
       const res = await api.post('/user/fetchOrGenerateQrCode');
-      const qr = res.data.qr;
-      set({
-        qrData: {
-          qr: qr.qr_code,
-          is_used: qr.is_used,
-          expires_at: qr.expires_at,
-        },
-        status: res.data.status,
-      });
+      if (res.data?.qr) set(toState(res.data.qr));
     } catch (error) {
-      console.error('Refresh QR error:', error);
-    } finally {
-      set({ loading: false });
+      // Try again on the next poll
     }
   },
 
+  // Supervisor: records attendance from a scanned code. Returns the server's answer.
   scanQRCode: async (qrCode) => {
     set({ loading: true });
     try {
       const res = await api.post('/user/scanQrCode', { qr_code: qrCode });
-       return res.data;
-    } catch (error) {
-      console.error('Scan QR error:', error);
+      return res.data;
     } finally {
       set({ loading: false });
     }

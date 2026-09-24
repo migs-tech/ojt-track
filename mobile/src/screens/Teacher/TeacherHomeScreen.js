@@ -1,4 +1,6 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, RefreshControl, Alert } from "react-native";
+import { errorMessage } from "@/lib/api";
+import { notify } from "@/lib/notify";
 import { FontAwesome, MaterialIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useState, useEffect } from "react";
@@ -21,6 +23,14 @@ export default function TeacherHomeScreen() {
   const { noAttendanceRecords, fetchNoAttendanceRecords, recordAttendance, trainees, fetchTrainees } =
     useTraineeStore();
   const { attendanceRecordToday, fetchAttendanceRecordToday } = useAttendanceStore();
+  const [refreshing, setRefreshing] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([fetchAttendanceRecordToday(), fetchTrainees()]);
+    setRefreshing(false);
+  };
 
   useEffect(() => {
     fetchAttendanceRecordToday();
@@ -38,7 +48,9 @@ export default function TeacherHomeScreen() {
   );
 
   useEffect(() => {
-    if (noAttendanceRecords && noAttendanceRecords.length > 0) {
+    if (!noAttendanceRecords || noAttendanceRecords.length === 0) {
+      setItems([]);
+    } else {
       setItems([
         { label: "-- Select a student --", value: null },
         ...noAttendanceRecords.map((t) => ({
@@ -49,45 +61,53 @@ export default function TeacherHomeScreen() {
     }
   }, [noAttendanceRecords]);
 
+  // Marking someone absent is easy to get wrong, so ask first
+  const confirmRecord = () => {
+    if (attendance !== "absent") return handleRecordAttendance();
+    const selected = (noAttendanceRecords || []).find((s) => s.trainee_id === selectedStudentId);
+    Alert.alert("Mark as absent?", `${selected?.trainee_name ?? "This trainee"} will be marked absent for today.`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Mark absent", style: "destructive", onPress: handleRecordAttendance },
+    ]);
+  };
+
   const handleRecordAttendance = async () => {
     if (!selectedStudentId) {
-      alert("Please select a student.");
+      notify.error("Choose a trainee", "Select who to record attendance for.");
       return;
     }
-
+    setSaving(true);
     try {
-      await recordAttendance({
+      const res = await recordAttendance({
         studentId: selectedStudentId,
         status: attendance,
       });
-
+      if (res?.success === false) {
+        notify.error("Not recorded", res.message || "Please try again.");
+        return;
+      }
+      const selected = noAttendanceRecords.find((s) => s.trainee_id === selectedStudentId);
       setModalVisible(false);
       setSelectedStudentId(null);
-
-      const selected = noAttendanceRecords.find((s) => s.trainee_id === selectedStudentId);
-
-      Toast.show({
-        type: "successCheck",
-        text1: "Attendance Recorded",
-        text2: `${attendance} for ${selected?.trainee_name ?? "student"}`,
-        position: "top",
-        topOffset: 110,
-      });
+      notify.success(
+        "Attendance recorded",
+        `${selected?.trainee_name ?? "Trainee"} marked ${attendance}.`
+      );
+      fetchAttendanceRecordToday();
     } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "Error",
-        text2: "Failed to record attendance.",
-        position: "top",
-        topOffset: 110,
-      });
-      console.error(error);
+      notify.error("Not recorded", errorMessage(error, "Failed to record attendance."));
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.flatListContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.flatListContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#2076cc"]} />}
+      >
         {/* Present / Absent Boxes */}
         <View style={styles.row}>
           <View style={[styles.box, styles.present]}>
@@ -210,8 +230,8 @@ export default function TeacherHomeScreen() {
                   styles.modalButton,
                   selectedStudentId ? styles.recordButton : styles.recordButtonDisabled,
                 ]}
-                disabled={!selectedStudentId}
-                onPress={handleRecordAttendance}
+                disabled={!selectedStudentId || saving}
+                onPress={confirmRecord}
               >
                 <Text style={styles.recordText}>Record</Text>
               </TouchableOpacity>

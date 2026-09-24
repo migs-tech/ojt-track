@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -12,15 +12,19 @@ import {
   Pressable,
   ScrollView,
   Animated,
+  RefreshControl,
+  KeyboardAvoidingView,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import { format } from "date-fns";
+import { errorMessage } from "@/lib/api";
+import { notify } from "@/lib/notify";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import { useReportStore } from "@/store/useReportStore";
 import Modal from "react-native-modal"; // 👈 use this instead of RN Modal
-import { set } from "date-fns";
-
 const Tab = createMaterialTopTabNavigator();
 
 function SubmitReport() {
@@ -52,19 +56,14 @@ function SubmitReport() {
       return;
     }
 
+    // One photo per report, compressed so it stays under the server's 5 MB limit
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
-      allowsMultipleSelection: true,
+      quality: 0.5,
+      allowsMultipleSelection: false,
     });
-
-    if (!result.canceled) {
-      let newFiles = [...files, ...result.assets];
-      if (newFiles.length > 1) {
-        showAlert("You can only upload one image per report.");
-        newFiles = newFiles.slice(0, 1);
-      }
-      setFiles(newFiles);
+    if (!result.canceled && result.assets?.length) {
+      setFiles([result.assets[0]]);
     }
   };
 
@@ -83,14 +82,19 @@ function SubmitReport() {
   };
 
   const submitReport = async () => {
-    if (!title || !description) {
-      showMessage("Please fill in all required fields", "error");
+    if (!title.trim() || !description.trim()) {
+      showMessage("Please enter a title and a description.", "error");
+      return;
+    }
+    if (files.length === 0) {
+      showMessage("Please add a photo of your work.", "error");
       return;
     }
     const formData = new FormData();
     formData.append("title", title);
     formData.append("description", description);
-    formData.append("date", date.toISOString());
+    // The calendar day on the phone (toISOString() is UTC and can shift the day)
+    formData.append("date", format(date, "yyyy-MM-dd"));
 
     if (files.length > 0) {
       files.forEach((file, i) => {
@@ -104,7 +108,7 @@ function SubmitReport() {
     try {
       const res = await saveReport(formData);
       if (res.success) {
-        showMessage("Report submitted successfully", "success");
+        notify.success("Report submitted", "Your supervisor can now see it.");
         setTitle("");
         setDescription("");
         setDate(new Date());
@@ -115,12 +119,13 @@ function SubmitReport() {
       }
       
     } catch (error) {
-      showMessage("Failed to submit report", "error");
+      showMessage(errorMessage(error, "Failed to submit report"), "error");
     }
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
       {message && (
         <View
           style={[
@@ -191,6 +196,7 @@ function SubmitReport() {
           value={date}
           mode="date"
           display={Platform.OS === "ios" ? "spinner" : "default"}
+          maximumDate={new Date()}
           onChange={(event, selectedDate) => {
             setShowDatePicker(Platform.OS === "ios");
             if (selectedDate) setDate(selectedDate);
@@ -212,7 +218,7 @@ function SubmitReport() {
       <TouchableOpacity style={styles.selectBtn} onPress={pickFile}>
         <Ionicons name="images" size={20} color="#fff" />
         <Text style={styles.btnText}>
-          {files.length > 0 ? "Add More Images" : "Select Images"}
+          {files.length > 0 ? "Change photo" : "Add a photo (required)"}
         </Text>
       </TouchableOpacity>
 
@@ -238,7 +244,7 @@ function SubmitReport() {
         disabled={loading}
       >
         <Text style={styles.submitText}>
-          {loading ? "Saving..." : "Submit Weekly Report"}
+          {loading ? "Submitting..." : "Submit Report"}
         </Text>
       </TouchableOpacity>
       <Modal
@@ -271,22 +277,24 @@ function SubmitReport() {
           </Pressable>
         </View>
       </Modal>
-    </View>
+    </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
-
 function History({ navigation }) {
   const { reports, getReports} = useReportStore();
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchReports = async () => {
-      setLoading(true);
-      await getReports();
-      setLoading(false);
-    };
-    fetchReports();
-  }, []);
+  const [loading, setLoading] = useState(reports.length === 0);
+  const [refreshing, setRefreshing] = useState(false);
+  useFocusEffect(
+    useCallback(() => {
+      getReports().finally(() => setLoading(false));
+    }, [getReports])
+  );
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await getReports();
+    setRefreshing(false);
+  };
 
   const validReports = reports.filter(Boolean);
 
@@ -301,6 +309,7 @@ function History({ navigation }) {
       ) : (
         <FlatList
           contentContainerStyle={{ flexGrow: 1 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#2076cc"]} />}
           data={validReports}
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => (
@@ -321,7 +330,10 @@ function History({ navigation }) {
           )}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No Report yet</Text>
+              <Text style={styles.emptyText}>No reports yet</Text>
+              <Text style={{ color: "#94a3b8", marginTop: 6, textAlign: "center" }}>
+                Reports you submit appear here. Pull down to refresh.
+              </Text>
             </View>
           }
         />

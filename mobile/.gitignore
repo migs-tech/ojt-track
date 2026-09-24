@@ -39,3 +39,7 @@ yarn-error.*
 app-example
 
 /build-*.apk
+
+# Local test builds
+.web-check*/
+.export-check/

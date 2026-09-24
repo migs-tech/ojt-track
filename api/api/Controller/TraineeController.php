@@ -221,7 +221,10 @@ class TraineeController {
                     ssr.status,
                     ssr.created_at,
                     ssr.updated_at,
-                    COALESCE(NULLIF(u.complete_name, ''), u.username) AS trainee_name
+                    COALESCE(NULLIF(u.complete_name, ''), u.username) AS trainee_name,
+                    u.avatar_url,
+                    u.course,
+                    u.email
                 FROM student_supervisor_requests ssr
                 INNER JOIN users u ON ssr.user_id = u.id
                 WHERE ssr.supervisor_id = :supervisor_id

@@ -1,132 +1,137 @@
-import React, { useState } from "react";
+// Supervisor: trainees asking to be supervised. Accept or decline each request.
+import React, { useCallback, useState } from "react";
 import {
-  View,
-  Text,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  RefreshControl,
   StyleSheet,
-  ScrollView,
+  Text,
   TouchableOpacity,
+  View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import useTraineeStore from "@/store/useTraineeStore";
+import Avatar from "@/components/Avatar";
+import { errorMessage } from "@/lib/api";
+import { notify } from "@/lib/notify";
 
 export default function RequestTraineeScreen() {
-  const { traineeRequests, updateTraineeRequest } = useTraineeStore();
-  const [trainees, setTrainees] = useState([...traineeRequests]);
-  const [message, setMessage] = useState(null);
+  const { traineeRequests, fetchTraineeRequests, updateTraineeRequest, fetchTrainees } = useTraineeStore();
+  const [refreshing, setRefreshing] = useState(false);
+  const [working, setWorking] = useState(null);
 
-  const showMessage = (text, type) => {
-    setMessage({ text, type });
-    setTimeout(() => setMessage(null), 2000);
+  useFocusEffect(
+    useCallback(() => {
+      fetchTraineeRequests();
+    }, [fetchTraineeRequests])
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchTraineeRequests();
+    setRefreshing(false);
   };
 
-  const handleApprove = async (id) => {
-    const res = await updateTraineeRequest(id, 1);
-    if (res.success) {
-      setTrainees((prev) => prev.filter((t) => t.id !== id));
-      showMessage("Trainee Approved", "success");
+  const respond = async (item, status) => {
+    setWorking(item.id);
+    try {
+      const res = await updateTraineeRequest(item.id, status);
+      if (res?.success) {
+        if (status === 1) {
+          notify.success("Trainee accepted", `${item.trainee_name} is now your trainee.`);
+          fetchTrainees();
+        } else {
+          notify.info("Request declined", `${item.trainee_name} was notified.`);
+        }
+        await fetchTraineeRequests();
+      } else {
+        notify.error("Couldn't update the request", res?.message || "Please try again.");
+      }
+    } catch (e) {
+      notify.error("Couldn't update the request", errorMessage(e));
+    } finally {
+      setWorking(null);
     }
   };
 
-  const handleDecline = async (id) => {
-    const res = await updateTraineeRequest(id, 2);
-    if (res.success) {
-      setTrainees((prev) => prev.filter((t) => t.id !== id));
-      showMessage("Trainee Declined", "error");
-    }
+  const decline = (item) => {
+    Alert.alert("Decline this request?", `${item.trainee_name} will need to choose another supervisor.`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Decline", style: "destructive", onPress: () => respond(item, 2) },
+    ]);
   };
+
+  const list = Array.isArray(traineeRequests) ? traineeRequests : [];
 
   return (
-    <View style={styles.container}>
-      {/* ✅ Inline Message */}
-      {message && (
-        <View
-          style={[
-            styles.messageBanner,
-            message.type === "success" ? styles.success : styles.error,
-          ]}
-        >
-          <Ionicons
-            name={message.type === "success" ? "checkmark-circle" : "close-circle"}
-            size={22}
-            color={message.type === "success" ? "#2E7D32" : "#C62828"}
-          />
-          <Text
-            style={[
-              styles.messageText,
-              { color: message.type === "success" ? "#2E7D32" : "#C62828" },
-            ]}
-          >
-            {message.text}
+    <FlatList
+      style={styles.container}
+      contentContainerStyle={{ padding: 16, flexGrow: 1 }}
+      data={list}
+      keyExtractor={(item) => String(item.id)}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#2076cc"]} />}
+      ListHeaderComponent={
+        list.length ? (
+          <Text style={styles.header}>
+            {list.length} {list.length === 1 ? "trainee wants" : "trainees want"} you as their supervisor
           </Text>
+        ) : null
+      }
+      renderItem={({ item }) => (
+        <View style={styles.row}>
+          <Avatar uri={item.avatar_url} name={item.trainee_name} size={44} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.name}>{item.trainee_name}</Text>
+            {item.course || item.email ? (
+              <Text style={styles.sub} numberOfLines={1}>{item.course || item.email}</Text>
+            ) : null}
+          </View>
+          {working === item.id ? (
+            <ActivityIndicator color="#2076cc" />
+          ) : (
+            <View style={styles.actions}>
+              <TouchableOpacity style={[styles.btn, styles.declineBtn]} onPress={() => decline(item)} disabled={working !== null}>
+                <Ionicons name="close" size={20} color="#dc2626" />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.btn, styles.acceptBtn]} onPress={() => respond(item, 1)} disabled={working !== null}>
+                <Ionicons name="checkmark" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       )}
-
-      <Text style={styles.title}>Requested Trainees</Text>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 20 }}
-      >
-        {trainees.length > 0 ? (
-          trainees.map((item) => (
-            <View key={item.id} style={styles.row}>
-              <Text style={styles.name}>{item.trainee_name}</Text>
-              <View style={styles.actions}>
-                <TouchableOpacity onPress={() => handleDecline(item.id)}>
-                  <Ionicons name="close-circle" size={28} color="#F44336" />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleApprove(item.id)}>
-                  <Ionicons name="checkmark-circle" size={28} color="#4CAF50" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))
-        ) : (
-          <Text style={styles.empty}>No trainee requests available</Text>
-        )}
-      </ScrollView>
-    </View>
+      ListEmptyComponent={
+        <View style={styles.empty}>
+          <Ionicons name="people-outline" size={48} color="#cbd5e1" />
+          <Text style={styles.emptyTitle}>No requests right now</Text>
+          <Text style={styles.emptyText}>When a trainee chooses you as their supervisor, they appear here.</Text>
+        </View>
+      }
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff", padding: 16 },
-  title: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 16,
-    textAlign: "center",
-  },
+  container: { flex: 1, backgroundColor: "#f5f7fb" },
+  header: { fontSize: 14, color: "#64748b", marginBottom: 12 },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#f9f9f9",
+    gap: 12,
+    backgroundColor: "#fff",
     padding: 14,
-    borderRadius: 10,
+    borderRadius: 14,
     marginBottom: 10,
   },
-  name: { fontSize: 16, fontWeight: "500" },
-  actions: { flexDirection: "row", gap: 12 },
-  empty: {
-    textAlign: "center",
-    marginTop: 40,
-    fontSize: 16,
-    color: "gray",
-  },
-  // ✅ Message Banner
-  messageBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 10,
-    position: "absolute",
-    top: 10,
-    left: 16,
-    right: 16,
-    zIndex: 10,
-  },
-  success: { backgroundColor: "#DFF6E0" }, // light green
-  error: { backgroundColor: "#FDE2E1" }, // light red
-  messageText: { marginLeft: 8, fontSize: 15, fontWeight: "600" },
+  name: { fontSize: 16, fontWeight: "600", color: "#0f172a" },
+  sub: { fontSize: 13, color: "#64748b", marginTop: 2 },
+  actions: { flexDirection: "row", gap: 10 },
+  btn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  declineBtn: { borderWidth: 1.5, borderColor: "#fecaca" },
+  acceptBtn: { backgroundColor: "#16a34a" },
+  empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 8 },
+  emptyTitle: { fontSize: 17, fontWeight: "700", color: "#334155" },
+  emptyText: { fontSize: 13, color: "#94a3b8", textAlign: "center" },
 });

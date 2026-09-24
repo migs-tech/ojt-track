@@ -1,6 +1,6 @@
 
 // src/store/useAuthStore.js
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/secureStore';
 import { Alert } from 'react-native';
 import { create } from 'zustand';
 import {
@@ -13,20 +13,23 @@ import {
   verifyOtpApi,
   resetPasswordApi
 } from '@/api/authApi';
-import api, { setTokenProvider } from '@/lib/api';
+import Toast from 'react-native-toast-message';
+import api, { setTokenProvider, setUnauthorizedHandler, errorMessage } from '@/lib/api';
 
 export const useAuth = create((set) => ({
   user: null,
   token: null,
   role: null,
   loading: false,
+  // false until the saved login has been read, so the app doesn't flash the login screen
+  ready: false,
   profile: null,
-  setUser: (user) => set({ user }),
 
   login: async (username, password) => {
     set({ loading: true });
     try {
-      const credentials = { username, password };
+      // "client" tells the server this is the app (staff accounts use the website).
+      const credentials = { username: username.trim(), password, client: 'app' };
       const response = await login(credentials);
       if (response.success && response.user && response.token) {
         const { user, token } = response;
@@ -37,9 +40,8 @@ export const useAuth = create((set) => ({
         throw new Error(response?.message || 'Invalid login response.');
       }
     } catch (error) {
-      console.error('Login error:', error);
       set({ loading: false });
-      return Promise.reject(error);
+      return Promise.reject(new Error(errorMessage(error, 'Sign-in failed. Please try again.')));
     }
   },
 
@@ -51,7 +53,7 @@ export const useAuth = create((set) => ({
       return response;
     } catch (error) {
       set({ loading: false });
-      return Promise.reject(error);
+      return { success: false, message: errorMessage(error, 'Registration failed. Please try again.') };
     }
   },
 
@@ -64,7 +66,21 @@ export const useAuth = create((set) => ({
     }
     await SecureStore.deleteItemAsync('accessToken');
     await SecureStore.deleteItemAsync('user');
-    set({ token: null, user: null, role: null, loading: false });
+    set({ token: null, user: null, role: null, profile: null, loading: false });
+  },
+
+  // The server rejected the saved login (expired or revoked): sign out locally.
+  sessionExpired: async () => {
+    if (!useAuth.getState().token) return;
+    await SecureStore.deleteItemAsync('accessToken');
+    await SecureStore.deleteItemAsync('user');
+    set({ token: null, user: null, role: null, profile: null, loading: false });
+    Toast.show({
+      type: 'infoCheck',
+      text1: 'Signed out',
+      text2: 'Your session expired. Please sign in again.',
+      position: 'top',
+    });
   },
 
   checkLogin: async () => {
@@ -78,14 +94,14 @@ export const useAuth = create((set) => ({
           token,
           user,
           role: user?.role || null,
-          loading: false
+          loading: false,
+          ready: true,
         });
       } else {
-        set({ token: null, user: null, role: null, loading: false });
+        set({ token: null, user: null, role: null, loading: false, ready: true });
       }
     } catch (error) {
-      set({ token: null, user: null, role: null, loading: false });
-      Alert.alert('Error', 'Failed to load login state.');
+      set({ token: null, user: null, role: null, loading: false, ready: true });
     }
   },
 
@@ -125,8 +141,9 @@ export const useAuth = create((set) => ({
       set({ loading: false, profile: response.data });
       return response.data;
     } catch (error) {
+      // Offline or signed out: keep the last profile instead of crashing the screen
       set({ loading: false });
-      return Promise.reject(error);
+      return null;
     }
   },
 
@@ -138,7 +155,7 @@ export const useAuth = create((set) => ({
       return response;
     } catch (error) {
       set({ loading: false });
-      return Promise.reject(error);
+      return { success: false, message: errorMessage(error, 'Couldn\'t send the code. Please try again.') };
     }
   },
 
@@ -150,7 +167,7 @@ export const useAuth = create((set) => ({
       return response;
     } catch (error) {
       set({ loading: false });
-      return Promise.reject(error);
+      return { success: false, message: errorMessage(error, 'Couldn\'t check the code. Please try again.') };
     }
   },  
   
@@ -162,7 +179,7 @@ export const useAuth = create((set) => ({
       return response;
     } catch (error) {
       set({ loading: false });
-      return Promise.reject(error);
+      return { success: false, message: errorMessage(error, 'Couldn\'t reset the password. Please try again.') };
     }
   },
 
@@ -178,3 +195,4 @@ export const useAuth = create((set) => ({
 }));
 
 setTokenProvider(() => useAuth.getState().token);
+setUnauthorizedHandler(() => useAuth.getState().sessionExpired());

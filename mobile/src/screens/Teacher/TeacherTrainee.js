@@ -10,6 +10,7 @@ import {
   TextInput,
   Alert,
   Image,
+  RefreshControl,
 } from "react-native";
 import { FAB } from "react-native-paper";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -96,11 +97,24 @@ export default function TeacherTraineeScreen() {
     }, [fetchTraineeRequests, fetchAllAttendanceRecords, fetchTrainees])
   );
 
+  // Remind about new requests once per visit, not on every refresh
+  const remindedRequests = useRef(false);
   useEffect(() => {
-    if (traineeRequests.length > 0) {
+    if (traineeRequests.length > 0 && !remindedRequests.current) {
+      remindedRequests.current = true;
       setShowModal(true);
     }
   }, [traineeRequests]);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([fetchTrainees(), fetchAllAttendanceRecords(), fetchTraineeRequests()]);
+    setRefreshing(false);
+  };
+  const refreshControl = (
+    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#2076cc"]} />
+  );
 
   useEffect(() => {
     const loadData = async () => {
@@ -111,8 +125,8 @@ export default function TeacherTraineeScreen() {
     loadData();
   }, [fetchTrainees, fetchAllAttendanceRecords]);
 
-  const filteredTrainees = trainees.filter((trainee) =>
-    trainee.trainee_name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredTrainees = (trainees || []).filter((trainee) =>
+    String(trainee.trainee_name || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const formattedAttendance = Object.entries(
@@ -344,6 +358,7 @@ export default function TeacherTraineeScreen() {
             keyExtractor={(item) => String(item.id)}
             renderItem={renderTrainee}
             contentContainerStyle={styles.listContent}
+            refreshControl={refreshControl}
           />
         )
       ) : loading ? (
@@ -367,6 +382,7 @@ export default function TeacherTraineeScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderAttendance}
           contentContainerStyle={styles.listContent}
+          refreshControl={refreshControl}
         />
       )}
 

@@ -1,515 +1,395 @@
-import { useQrStore } from '@/store/useQrStore';
-import { Feather } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+// Trainee QR tab: get a code by email → enter it → show the QR → supervisor scans it → time out.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Button,
-  Keyboard,
+  Alert,
   KeyboardAvoidingView,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
-  View
+  View,
 } from 'react-native';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
-import { useOtp } from '@/store/useOtpStore';
-import useTraineeStore  from '@/store/useTraineeStore';
-import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from '@react-navigation/native';
+import { useQrStore } from '@/store/useQrStore';
+import { useAttendanceStore } from '@/store/useAttendanceStore';
+import { useSupervisorStore } from '@/store/useSupervisorStore';
+import { verifyOtp, timeOut } from '@/api/studentApi';
+import { errorMessage } from '@/lib/api';
+import { notify } from '@/lib/notify';
+import OtpRequestModal from '@/components/OtpRequestModal';
 
-export default function StudentMailScreen() {
-  const {
-    qrData,
-    status,
-    fetchQrCode,
-    generateQrCode,
-    loading,
-    refreshQrStatus,
-  } = useQrStore();
-  const { timeOutTrainee } = useTraineeStore();
+const BLUE = '#2076cc';
 
-  const [countdown, setCountdown] = useState(null);
-  const [isExpired, setIsExpired] = useState(false);
-  const intervalRef = useRef(null);
+const pad = (n) => String(n).padStart(2, '0');
 
+export default function StudentQrScreen() {
+  const { qrData, status, fetchQrCode, generateQrCode, refreshQrStatus } = useQrStore();
+  const { myAttendance, fetchMyAttendance } = useAttendanceStore();
+  const { mySupervisor, fetchMySupervisor } = useSupervisorStore();
+
+  const [loaded, setLoaded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [otp, setOtp] = useState('');
+  const [otpError, setOtpError] = useState('');
   const [verifying, setVerifying] = useState(false);
-  const { verifyOtp } = useOtp();
+  const [otpModal, setOtpModal] = useState(false);
+  const [codeSentTo, setCodeSentTo] = useState(null);
+  const [timingOut, setTimingOut] = useState(false);
+  const [remaining, setRemaining] = useState(null);
+  const pollRef = useRef(null);
 
-  const [message, setMessage] = useState(null);
-  
-  const showMessage = (text, type) => {
-      setMessage({ text, type });
-      setTimeout(() => setMessage(null), 2000);
+  const load = useCallback(async () => {
+    await Promise.all([fetchQrCode(), fetchMyAttendance(), fetchMySupervisor()]);
+    setLoaded(true);
+  }, [fetchQrCode, fetchMyAttendance, fetchMySupervisor]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
   };
 
-  const handleVerifyOtp = async () => {
-    if (!otp.trim()) {
-       showMessage("Please enter the OTP.", "error");
+  const today = myAttendance?.today;
+  const hasSupervisor = Array.isArray(mySupervisor) && mySupervisor.some((r) => Number(r.status) === 1);
+  const expiresAt = qrData?.expires_at ? new Date(String(qrData.expires_at).replace(' ', 'T')).getTime() : 0;
+  const qrActive = !!qrData?.qr && qrData.is_used === 0 && expiresAt > Date.now();
+
+  const state = today?.time_out
+    ? 'done'
+    : today?.time_in
+    ? 'timedIn'
+    : qrActive
+    ? 'showQr'
+    : 'needCode';
+
+  // While the QR is on screen: countdown, and check every 4 s whether the supervisor scanned it.
+  useEffect(() => {
+    if (state !== 'showQr') {
+      setRemaining(null);
+      return;
+    }
+    const tick = () => setRemaining(Math.max(0, expiresAt - Date.now()));
+    tick();
+    const countdown = setInterval(tick, 1000);
+    pollRef.current = setInterval(async () => {
+      await refreshQrStatus();
+      const qr = useQrStore.getState().qrData;
+      if (qr?.is_used === 1) {
+        clearInterval(pollRef.current);
+        await fetchMyAttendance();
+        notify.success('Timed in', 'Your supervisor scanned your QR code.');
+      }
+    }, 4000);
+    return () => {
+      clearInterval(countdown);
+      clearInterval(pollRef.current);
+    };
+  }, [state, expiresAt]);
+
+  // Expired while open: go back to the code step
+  useEffect(() => {
+    if (remaining === 0) fetchQrCode();
+  }, [remaining]);
+
+  const submitCode = async () => {
+    const code = otp.trim();
+    if (!/^\d{6}$/.test(code)) {
+      setOtpError('Enter the 6-digit code from your email.');
       return;
     }
     setVerifying(true);
-
-    const otpData = { otp };
-
+    setOtpError('');
     try {
-     const res = await verifyOtp(otpData);
-      setOtp('');
-      if (res.success) {
-        await generateQrCode();
+      const res = await verifyOtp({ otp: code });
+      if (res?.success) {
+        setOtp('');
+        const made = await generateQrCode();
+        if (made?.qr) {
+          setCodeSentTo(null);
+          notify.success('Code accepted', 'Show this QR code to your supervisor.');
+        } else {
+          setOtpError(made?.message || "Couldn't make your QR code. Please try again.");
+        }
       } else {
-         showMessage(res.message || "OTP verification failed. Please try again.", "error");
+        setOtpError(res?.message || 'That code is wrong or has expired.');
       }
-
-    } catch (error) {
-        showMessage("An error occurred during OTP verification. Please try again.", "error");
+    } catch (e) {
+      setOtpError(errorMessage(e, "Couldn't check the code. Please try again."));
     } finally {
       setVerifying(false);
     }
   };
 
-  // Fetch QR data on mount
-  useEffect(() => {
-    fetchQrCode();
-  }, []);
+  const confirmTimeOut = () => {
+    Alert.alert(
+      'Time out now?',
+      `You timed in at ${today?.time_in}. You can only time out once a day.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Time out', style: 'destructive', onPress: doTimeOut },
+      ]
+    );
+  };
 
-  // Poll server for QR status when screen focused
-  useFocusEffect(
-    useCallback(() => {
-      if (!qrData?.expires_at) return;
-
-      if (intervalRef.current) clearInterval(intervalRef.current);
-
-      intervalRef.current = setInterval(() => {
-        if (!qrData?.expires_at) return;
-
-        const now = Date.now();
-        const expiresAt = new Date(qrData.expires_at).getTime();
-
-        if (qrData.is_used === 1 || now >= expiresAt) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-          return;
-        }
-
-        refreshQrStatus();
-      }, 3000);
-
-      return () => {
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
-      };
-      // Restart polling only when the QR itself changes, not on every refresh response
-    }, [qrData?.qr, qrData?.expires_at, qrData?.is_used])
-  );
-
-  // Countdown timer
-  useEffect(() => {
-    if (!qrData?.expires_at) return;
-
-    const expiresAt = new Date(qrData.expires_at).getTime();
-    const now = Date.now();
-
-    if (qrData.is_used === 0 && now >= expiresAt) {
-      setIsExpired(true);
-      setCountdown(null);
-      return;
-    }
-
-    if (qrData.is_used === 0 && now < expiresAt) {
-      setIsExpired(false);
-      const countdownInterval = setInterval(() => {
-        const remaining = expiresAt - Date.now();
-        if (remaining <= 0) {
-          clearInterval(countdownInterval);
-          setIsExpired(true);
-          setCountdown(null);
-        } else {
-          const hrs = Math.floor(remaining / 1000 / 60 / 60);
-          const mins = Math.floor((remaining / 1000 / 60) % 60);
-          const secs = Math.floor((remaining / 1000) % 60);
-          setCountdown(
-            `${hrs.toString().padStart(2, '0')}:${mins
-              .toString()
-              .padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-          );
-        }
-      }, 1000);
-
-      return () => clearInterval(countdownInterval);
-    }
-  }, [qrData]);
-
-  const timeOut = async () => {
+  const doTimeOut = async () => {
+    setTimingOut(true);
     try {
-      const res = await timeOutTrainee();
-      if (res.success) {
-         showMessage("Timed out successfully.", "success");
+      const res = await timeOut();
+      if (res?.success) {
+        notify.success('Timed out', res.time_out ? `Recorded at ${res.time_out}.` : 'Have a good rest of the day!');
       } else {
-          showMessage(res.message || "Could not time out. Please try again.", "warning");
+        notify.error("Couldn't time out", res?.message || 'Please try again.');
       }
-    } catch (error) {
-        showMessage("An error occurred while timing out. Please try again.", "error");
+    } catch (e) {
+      notify.error("Couldn't time out", errorMessage(e));
+    } finally {
+      await fetchMyAttendance();
+      setTimingOut(false);
     }
   };
 
-
-  // ✅ Show loading screen while fetching or generating
-  if (loading || (!qrData && !status)) {
+  if (!loaded) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#22c55e" />
-        <Text style={styles.loadingText}>Loading QR Code...</Text>
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={BLUE} />
+        <Text style={styles.muted}>Loading…</Text>
       </View>
     );
   }
 
+  const mins = remaining !== null ? Math.floor(remaining / 60000) : 0;
+  const secs = remaining !== null ? Math.floor((remaining % 60000) / 1000) : 0;
+
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[BLUE]} />}
       >
-        <ScrollView
-          contentContainerStyle={styles.container}
-          keyboardShouldPersistTaps="handled"
-        >
-          {message && (
-            <View
-              style={[
-                styles.messageBanner,
-                styles[message.type] // maps directly to success, error, info, warning
-              ]}
+        {state === 'done' && (
+          <View style={[styles.card, styles.centerCard]}>
+            <View style={[styles.bigIcon, { backgroundColor: '#dcfce7' }]}>
+              <Ionicons name="checkmark-done" size={40} color="#16a34a" />
+            </View>
+            <Text style={styles.title}>You're done for today</Text>
+            <Text style={styles.muted}>
+              Timed in {today.time_in} · Timed out {today.time_out}
+            </Text>
+            {today.duration ? (
+              <Text style={[styles.muted, { marginTop: 4 }]}>
+                {today.duration.replace(/\s*\d+s$/, '')} recorded
+              </Text>
+            ) : null}
+            <Text style={[styles.muted, { marginTop: 16, textAlign: 'center' }]}>
+              Come back tomorrow for a new QR code.
+            </Text>
+          </View>
+        )}
+
+        {state === 'timedIn' && (
+          <View style={[styles.card, styles.centerCard]}>
+            <View style={[styles.bigIcon, { backgroundColor: '#dbeafe' }]}>
+              <Ionicons name="briefcase-outline" size={38} color={BLUE} />
+            </View>
+            <Text style={styles.title}>You're timed in</Text>
+            <Text style={styles.muted}>Since {today.time_in}</Text>
+            <TouchableOpacity
+              style={[styles.dangerButton, timingOut && { opacity: 0.7 }]}
+              onPress={confirmTimeOut}
+              disabled={timingOut}
             >
-              <Ionicons
-                name={
-                  message.type === "success"
-                    ? "checkmark-circle"
-                    : message.type === "error"
-                    ? "close-circle"
-                    : message.type === "info"
-                    ? "information-circle"
-                    : "warning"
-                }
-                size={22}
-                color={
-                  message.type === "success"
-                    ? "#2E7D32"
-                    : message.type === "error"
-                    ? "#C62828"
-                    : message.type === "info"
-                    ? "#0288D1"
-                    : "#ED6C02"
-                }
-              />
-              <Text
-                style={[
-                  styles.messageText,
-                  {
-                    color:
-                      message.type === "success"
-                        ? "#2E7D32"
-                        : message.type === "error"
-                        ? "#C62828"
-                        : message.type === "info"
-                        ? "#0288D1"
-                        : "#ED6C02"
-                  }
-                ]}
-              >
-                {message.text}
+              {timingOut ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Feather name="log-out" size={18} color="#fff" />
+                  <Text style={styles.buttonText}>Time out</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <Text style={[styles.muted, { marginTop: 10, textAlign: 'center' }]}>
+              If you forget, you're timed out automatically at 11:00 PM.
+            </Text>
+          </View>
+        )}
+
+        {state === 'showQr' && (
+          <View style={[styles.card, styles.centerCard]}>
+            <Text style={styles.title}>Show this to your supervisor</Text>
+            <Text style={styles.muted}>They scan it to record your time-in.</Text>
+            <View style={styles.qrBox}>
+              <QRCode value={String(qrData.qr)} size={220} color="#0f172a" backgroundColor="#fff" />
+            </View>
+            <View style={styles.row}>
+              <Feather name="clock" size={16} color={remaining !== null && remaining < 5 * 60000 ? '#dc2626' : '#475569'} />
+              <Text style={[styles.countdown, remaining !== null && remaining < 5 * 60000 && { color: '#dc2626' }]}>
+                Expires in {pad(mins)}:{pad(secs)}
               </Text>
             </View>
-          )}
-          {/*OTP Form when no QR */}
-          {(!qrData?.qr || (isExpired && qrData.is_used === 0)) && (
-            <View style={[styles.card, styles.otpCard]}>
-              <Text style={styles.otpTitle}>Enter OTP</Text>
-              <Text style={styles.otpSubtitle}>
-                Please enter the OTP sent to your registered email/phone
+            <View style={[styles.row, { marginTop: 10 }]}>
+              <ActivityIndicator size="small" color="#94a3b8" />
+              <Text style={styles.muted}>Waiting for the scan…</Text>
+            </View>
+          </View>
+        )}
+
+        {state === 'needCode' && (
+          <>
+            {!hasSupervisor ? (
+              <View style={[styles.notice, { backgroundColor: '#fef3c7' }]}>
+                <Ionicons name="information-circle-outline" size={20} color="#b45309" />
+                <Text style={[styles.noticeText, { color: '#92400e' }]}>
+                  You need a supervisor before you can time in. Choose one on the Home tab.
+                </Text>
+              </View>
+            ) : null}
+
+            <View style={styles.card}>
+              <View style={styles.stepHeader}>
+                <View style={styles.stepNum}><Text style={styles.stepNumText}>1</Text></View>
+                <Text style={styles.stepTitle}>Get a code by email</Text>
+              </View>
+              <Text style={[styles.muted, { marginBottom: 12 }]}>
+                {codeSentTo
+                  ? `We sent a code to ${codeSentTo}. It's valid for 5 minutes.`
+                  : "We'll email you a 6-digit code after you confirm your password."}
               </Text>
-              <TextInput
-                style={styles.otpInput}
-                placeholder="Enter OTP"
-                keyboardType="numeric"
-                value={otp}
-                onChangeText={setOtp}
-                maxLength={6}
-              />
               <TouchableOpacity
-                style={[styles.verifyButton, verifying && { backgroundColor: '#9ca3af' }]}
-                onPress={handleVerifyOtp}
-                disabled={verifying}
+                style={[codeSentTo ? styles.outlineButton : styles.primaryButton, !hasSupervisor && styles.disabled]}
+                onPress={() => setOtpModal(true)}
+                disabled={!hasSupervisor}
               >
-                <Text style={styles.verifyButtonText}>
-                  {verifying ? "Verifying..." : "Verify OTP"}
+                <Text style={codeSentTo ? styles.outlineButtonText : styles.buttonText}>
+                  {codeSentTo ? 'Send a new code' : 'Email me a code'}
                 </Text>
               </TouchableOpacity>
             </View>
-          )}
-          {/* QR Code Display */}
-          {qrData?.qr && (
-            <View style={[styles.qrContainer, styles.card]}>
-              
-              {/* display message for verify not yet expired */}
-              {qrData.is_used === 1 || !isExpired ? (
-                <View style={styles.verificationHeader}>
-                  <Feather
-                    name="check-circle"
-                    size={24}
-                    color="#22c55e"
-                    style={styles.icon} 
-                  />
-                  <Text style={styles.verificationText}>
-                    OTP verified. You can now use your QR code
-                  </Text>
-                </View>
-              ) : isExpired ? (
-                <View style={styles.verificationHeader}>
-                  <Feather
-                    name="x-circle"
-                    size={24}
-                    color="#ef4444"
-                    style={styles.icon}
-                  />
-                  <Text style={styles.expiredText}>
-                    QR expired. Please generate a new one and verify it.
-                  </Text>
-                </View>
-              ) : null}
 
-              <View style={styles.expirationRow}>
-                <Feather name="clock" size={18} color="#555" style={styles.icon} />
-                <Text style={styles.expirationText}>
-                  Expires in: {countdown ?? '00:00:00'}
-                </Text>
+            <View style={styles.card}>
+              <View style={styles.stepHeader}>
+                <View style={styles.stepNum}><Text style={styles.stepNumText}>2</Text></View>
+                <Text style={styles.stepTitle}>Enter the code</Text>
               </View>
-
-              <View style={styles.qrBox}>
-                <QRCode
-                  value={String(qrData.qr)}
-                  size={200}
-                  color="#2076cc"
-                  backgroundColor="#fff"
-                  logoSize={40}
-                  logoMargin={2}
-                />
-
-                {qrData.is_used === 1 && (
-                  <Text style={styles.usedOverlay}>Attendance Recorded</Text>
-                )}
-                {isExpired && qrData.is_used === 0 && (
-                  <Text style={styles.expiredOverlay}>EXPIRED</Text>
-                )}
-              </View>
+              <TextInput
+                style={[styles.codeInput, otpError && { borderColor: '#fca5a5' }]}
+                value={otp}
+                onChangeText={(t) => {
+                  setOtp(t.replace(/\D/g, ''));
+                  setOtpError('');
+                }}
+                placeholder="••••••"
+                placeholderTextColor="#cbd5e1"
+                keyboardType="number-pad"
+                maxLength={6}
+                textContentType="oneTimeCode"
+                autoComplete="sms-otp"
+                onSubmitEditing={submitCode}
+              />
+              {otpError ? <Text style={styles.errorText}>{otpError}</Text> : null}
+              <TouchableOpacity
+                style={[styles.primaryButton, (verifying || otp.length !== 6) && styles.disabled]}
+                onPress={submitCode}
+                disabled={verifying || otp.length !== 6}
+              >
+                {verifying ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Show my QR code</Text>}
+              </TouchableOpacity>
             </View>
-          )}
 
-          {/* TIME OUT BUTTON */}
-          {qrData?.qr && qrData.is_used === 1 && (
-            <TouchableOpacity style={styles.timeOutButton} onPress={timeOut}>
-              <Feather name="log-out" size={20} color="#fff" style={{ marginRight: 8 }} />
-              <Text style={styles.timeOutButtonText}>Time Out</Text>
-            </TouchableOpacity>
-          )}
+            {qrData?.qr && qrData.is_used === 0 ? (
+              <Text style={[styles.muted, { textAlign: 'center' }]}>
+                Your last QR code expired. Get a new code to make another.
+              </Text>
+            ) : null}
+          </>
+        )}
+      </ScrollView>
 
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </TouchableWithoutFeedback>
+      <OtpRequestModal
+        visible={otpModal}
+        onClose={() => setOtpModal(false)}
+        onSent={(email) => {
+          setOtpModal(false);
+          setCodeSentTo(email || 'your email');
+          notify.success('Code sent', 'Check your email (and the spam folder).');
+        }}
+      />
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop: 16,
-    paddingHorizontal: 16,
-    backgroundColor: '#f9fafb',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f9fafb',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#555',
-  },
-  qrContainer: {
-    alignItems: 'center',
-    width: '100%',
-    marginTop: 20,
-  },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#f5f7fb' },
+  content: { padding: 16, paddingBottom: 32, backgroundColor: '#f5f7fb', flexGrow: 1 },
   card: {
-    backgroundColor: '#ffffff',
-    padding: 20,
+    backgroundColor: '#fff',
     borderRadius: 16,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    width: '100%',
+    padding: 18,
+    marginBottom: 14,
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
-  verificationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  verificationText: {
-    fontSize: 16,
-    color: '#22c55e',
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  expiredText: {
-    fontSize: 16,
-    color: '#ef4444',
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  expirationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  expirationText: {
-    fontSize: 14,
-    color: '#333',
-    marginLeft: 6,
-  },
+  centerCard: { alignItems: 'center', paddingVertical: 26 },
+  bigIcon: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  title: { fontSize: 20, fontWeight: '700', color: '#0f172a', marginBottom: 4, textAlign: 'center' },
+  muted: { fontSize: 13, color: '#64748b', lineHeight: 19 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   qrBox: {
-    backgroundColor: '#f5f5f5',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    marginBottom: 12,
-    position: 'relative',
-    width: 200,
-    height: 200,
-    justifyContent: 'center',
-  },
-  icon: {
-    marginRight: 4,
-  },
-  expiredOverlay: {
-    position: 'absolute',
-    transform: [{ rotate: '-45deg' }],
-    borderColor: 'red',
-    borderWidth: 2,
-    color: 'red',
-    fontWeight: 'bold',
-    fontSize: 18,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingVertical: 4,
-    paddingHorizontal: 30,
-    borderRadius: 4,
-    textAlign: 'center',
-    zIndex: 10,
-  },
-  usedOverlay: {
-    position: 'absolute',
-    transform: [{ rotate: '-45deg' }],
-    borderColor: 'green',
-    borderWidth: 2,
-    color: 'green',
-    fontWeight: 'bold',
-    fontSize: 18,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingVertical: 4,
-    paddingHorizontal: 30,
-    borderRadius: 4,
-    textAlign: 'center',
-    zIndex: 10,
-  },
-  // ✅ OTP Styles
-  otpCard: {
-    alignItems: 'center',
-    marginTop: 30,
-  },
-  otpTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 8,
-    color: '#1f2937',
-  },
-  otpSubtitle: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  otpInput: {
-    width: '80%',
+    marginVertical: 18,
+    padding: 14,
+    backgroundColor: '#fff',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 18,
-    textAlign: 'center',
-    letterSpacing: 4,
-    marginBottom: 20,
-    backgroundColor: '#f9fafb',
+    borderColor: '#e2e8f0',
   },
-  verifyButton: {
-    backgroundColor: '#2563eb',
+  countdown: { fontSize: 16, fontWeight: '700', color: '#475569' },
+  notice: { flexDirection: 'row', gap: 8, borderRadius: 12, padding: 12, marginBottom: 14, alignItems: 'flex-start' },
+  noticeText: { flex: 1, fontSize: 13, lineHeight: 18 },
+  stepHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  stepNum: { width: 26, height: 26, borderRadius: 13, backgroundColor: BLUE, alignItems: 'center', justifyContent: 'center' },
+  stepNumText: { color: '#fff', fontWeight: '700' },
+  stepTitle: { fontSize: 16, fontWeight: '700', color: '#0f172a' },
+  codeInput: {
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
     paddingVertical: 12,
-    paddingHorizontal: 32,
-    borderRadius: 12,
+    fontSize: 26,
+    letterSpacing: 10,
+    textAlign: 'center',
+    color: '#0f172a',
+    marginBottom: 10,
   },
-  verifyButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  timeOutButton: {
+  errorText: { color: '#b91c1c', fontSize: 13, marginBottom: 10 },
+  primaryButton: { backgroundColor: BLUE, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  outlineButton: { borderWidth: 1.5, borderColor: BLUE, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  outlineButtonText: { color: BLUE, fontWeight: '700', fontSize: 15 },
+  dangerButton: {
+    marginTop: 20,
     flexDirection: 'row',
+    gap: 8,
+    backgroundColor: '#dc2626',
+    borderRadius: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ef4444', // red
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    marginTop: 20,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
   },
-  timeOutButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  messageBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 10,
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 20,
-  },
-  success: { backgroundColor: "#DFF6E0" }, // light green
-  error: { backgroundColor: "#FDE2E1" }, // light red
-  info: { backgroundColor: "#E0F2FE" }, // light blue
-  warning: { backgroundColor: "#FFF4E5" }, // light yellow
-  messageText: { marginLeft: 8, fontSize: 15, fontWeight: "600" },
+  buttonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  disabled: { backgroundColor: '#cbd5e1', borderColor: '#cbd5e1' },
 });

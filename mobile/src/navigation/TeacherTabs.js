@@ -1,5 +1,6 @@
 // src/navigation/TeacherTabs.js
 import React from 'react';
+import Avatar from '@/components/Avatar';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import TeacherHomeScreen from '@/screens/Teacher/TeacherHomeScreen';
 import TeacherReportScreen from '@/screens/Teacher/TeacherReportScreen';
@@ -35,8 +36,10 @@ function CustomHeader() {
     return (
     <View style={styles.container}>
       <View style={styles.row}>
-        <Image
-          source={{ uri: profile?.avatar_url || 'https://static.vecteezy.com/system/resources/previews/037/336/395/non_2x/user-profile-flat-illustration-avatar-person-icon-gender-neutral-silhouette-profile-picture-free-vector.jpg' }}
+        <Avatar
+          uri={profile?.avatar_url}
+          name={profile?.complete_name || profile?.username}
+          size={40}
           style={styles.avatar}
         />
         <View style={styles.textContainer}>
