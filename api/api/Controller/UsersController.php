@@ -728,7 +728,11 @@ class UsersController {
      */
     public function fetchSupervisor() {
         try {
-            $stmt = $this->conn->prepare("SELECT * FROM users WHERE role = 2");
+            $stmt = $this->conn->prepare(
+                "SELECT id, username, COALESCE(NULLIF(complete_name, ''), username) AS complete_name, company, avatar_url
+                 FROM users WHERE role = 2
+                 ORDER BY complete_name"
+            );
             $stmt->execute();
             $supervisors = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -910,7 +914,7 @@ class UsersController {
             $userId = AuthHelper::validateToken()['id'];
 
             $stmt = $this->conn->prepare(
-                "SELECT r.*, u.username AS supervisor_name, r.status, u.avatar_url
+                "SELECT r.*, COALESCE(NULLIF(u.complete_name, ''), u.username) AS supervisor_name, r.status, u.avatar_url, u.company AS supervisor_company
                  FROM student_supervisor_requests r
                  JOIN users u ON r.supervisor_id = u.id
                  WHERE r.user_id = :user_id"
@@ -1306,8 +1310,8 @@ class UsersController {
                 return ['success' => false, 'error' => 'Username and password are required.'];
             }
 
-            $stmt = $this->conn->prepare("SELECT * FROM users WHERE username = :username");
-            $stmt->execute(['username' => $username]);
+            $stmt = $this->conn->prepare("SELECT * FROM users WHERE username = :username OR email = :email");
+            $stmt->execute(['username' => $username, 'email' => $username]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($user && (int) $user['id'] === (int) $traineeId && password_verify($password, $user['password'])) {
@@ -1405,7 +1409,7 @@ class UsersController {
             $update->execute([':id' => $row['id']]);
             return ['success' => true];
         }
-        return ['success' => false];
+        return ['success' => false, 'message' => 'That code is wrong or has expired. Request a new one if needed.'];
     }
     
     /** Export all users to an Excel file
@@ -1784,7 +1788,11 @@ class UsersController {
     public function getUserProfile(){
         $userId = AuthHelper::validateToken()['id'];
 
-        $stmt = $this->conn->prepare("SELECT COALESCE(NULLIF(complete_name, ''), username) AS complete_name, username, email, birthdate, avatar_url FROM users WHERE id = :id");
+        $stmt = $this->conn->prepare(
+            "SELECT COALESCE(NULLIF(complete_name, ''), username) AS complete_name, username, email, birthdate, avatar_url,
+                    role, email_flg, course, company, started_at, ojt_required_hours
+             FROM users WHERE id = :id"
+        );
         $stmt->execute(['id' => $userId]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
