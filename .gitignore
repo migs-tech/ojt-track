@@ -2,7 +2,7 @@
 api/api/config.php
 .env
 .env*.local
-mobile/google-services.json
+mobile/google-services*.json
 *.pem
 *.key
 *.jks

@@ -23,8 +23,8 @@
         "simulator": true
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://ojt-track-api.onrender.com/api",
-        "EXPO_PUBLIC_WEB_URL": "https://ojt-track.vercel.app"
+        "EXPO_PUBLIC_API_URL": "https://ojt-track-api-5vts.onrender.com/api",
+        "EXPO_PUBLIC_WEB_URL": "https://ojt-track-tau.vercel.app"
       }
     },
     "production": {
@@ -33,8 +33,8 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://ojt-track-api.onrender.com/api",
-        "EXPO_PUBLIC_WEB_URL": "https://ojt-track.vercel.app"
+        "EXPO_PUBLIC_API_URL": "https://ojt-track-api-5vts.onrender.com/api",
+        "EXPO_PUBLIC_WEB_URL": "https://ojt-track-tau.vercel.app"
       }
     }
   },
