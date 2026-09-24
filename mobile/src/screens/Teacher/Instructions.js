@@ -42,7 +42,7 @@ export default function Instructions() {
         <Animated.View
           style={{
             height: 3,
-            backgroundColor: "#010107ff",
+            backgroundColor: "#111827",
             width: widthAnimation,
             position: "absolute",
             top: 0,

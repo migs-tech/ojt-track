@@ -63,7 +63,7 @@ export default function ScanQrCode() {
   if (!permission) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color="#2076cc" />
+        <ActivityIndicator color="#1E4FC2" />
       </View>
     );
   }
@@ -71,7 +71,7 @@ export default function ScanQrCode() {
   if (!permission.granted) {
     return (
       <View style={styles.center}>
-        <Ionicons name="camera-outline" size={56} color="#94a3b8" />
+        <Ionicons name="camera-outline" size={56} color="#9CA3AF" />
         <Text style={styles.permTitle}>Camera access needed</Text>
         <Text style={styles.permText}>Allow the camera to scan your trainees' QR codes.</Text>
         {permission.canAskAgain ? (
@@ -84,7 +84,7 @@ export default function ScanQrCode() {
           </TouchableOpacity>
         )}
         <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 14 }}>
-          <Text style={{ color: '#64748b', fontWeight: '600' }}>Go back</Text>
+          <Text style={{ color: '#6B7280', fontWeight: '600' }}>Go back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -127,11 +127,11 @@ export default function ScanQrCode() {
       {result ? (
         <View style={styles.resultWrap}>
           <View style={styles.resultCard}>
-            <View style={[styles.resultIcon, { backgroundColor: result.ok ? '#dcfce7' : '#fee2e2' }]}>
+            <View style={[styles.resultIcon, { backgroundColor: result.ok ? '#EAF6EE' : '#FDEEEC' }]}>
               <Ionicons
                 name={result.ok ? 'checkmark-circle' : 'close-circle'}
                 size={40}
-                color={result.ok ? '#16a34a' : '#dc2626'}
+                color={result.ok ? '#15803D' : '#B42318'}
               />
             </View>
             <Text style={styles.resultTitle}>{result.title}</Text>
@@ -154,10 +154,10 @@ export default function ScanQrCode() {
 const C = 34;
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: '#f5f7fb' },
-  permTitle: { fontSize: 19, fontWeight: '700', color: '#0f172a', marginTop: 12 },
-  permText: { fontSize: 14, color: '#64748b', textAlign: 'center', marginTop: 6 },
-  permButton: { marginTop: 20, backgroundColor: '#2076cc', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 28 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: '#F6F7F9' },
+  permTitle: { fontSize: 19, fontWeight: '700', color: '#111827', marginTop: 12 },
+  permText: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginTop: 6 },
+  permButton: { marginTop: 20, backgroundColor: '#1E4FC2', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 28 },
   permButtonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' },
   title: { color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 24 },
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
   tr: { top: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4, borderTopRightRadius: 16 },
   bl: { bottom: 0, left: 0, borderBottomWidth: 4, borderLeftWidth: 4, borderBottomLeftRadius: 16 },
   br: { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4, borderBottomRightRadius: 16 },
-  hint: { color: '#e2e8f0', fontSize: 14, marginTop: 24, textAlign: 'center', paddingHorizontal: 32 },
+  hint: { color: '#E5E7EB', fontSize: 14, marginTop: 24, textAlign: 'center', paddingHorizontal: 32 },
   controls: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 32 },
   roundBtn: {
     width: 52,
@@ -182,11 +182,11 @@ const styles = StyleSheet.create({
   resultWrap: { ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end', padding: 16, backgroundColor: 'rgba(0,0,0,0.4)' },
   resultCard: { backgroundColor: '#fff', borderRadius: 24, padding: 22, alignItems: 'center' },
   resultIcon: { width: 68, height: 68, borderRadius: 34, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  resultTitle: { fontSize: 19, fontWeight: '700', color: '#0f172a', textAlign: 'center' },
-  resultText: { fontSize: 14, color: '#475569', textAlign: 'center', marginTop: 6, lineHeight: 20 },
+  resultTitle: { fontSize: 19, fontWeight: '700', color: '#111827', textAlign: 'center' },
+  resultText: { fontSize: 14, color: '#374151', textAlign: 'center', marginTop: 6, lineHeight: 20 },
   resultActions: { flexDirection: 'row', gap: 12, marginTop: 20, alignSelf: 'stretch' },
-  outlineBtn: { flex: 1, borderWidth: 1.5, borderColor: '#cbd5e1', borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
-  outlineText: { color: '#334155', fontWeight: '700', fontSize: 15 },
-  primaryBtn: { flex: 1, backgroundColor: '#2076cc', borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  outlineBtn: { flex: 1, borderWidth: 1.5, borderColor: '#D1D5DB', borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  outlineText: { color: '#374151', fontWeight: '700', fontSize: 15 },
+  primaryBtn: { flex: 1, backgroundColor: '#1E4FC2', borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   primaryText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 });

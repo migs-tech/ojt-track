@@ -119,7 +119,7 @@ function RequestScreen() {
   };
   
   return (
-    <View style={{ flex: 1, padding: 20, backgroundColor: "#f9fafb" }}>
+    <View style={{ flex: 1, padding: 20, backgroundColor: "#F6F7F9" }}>
       {message && (
         <View
           style={[
@@ -140,12 +140,12 @@ function RequestScreen() {
             size={22}
             color={
               message.type === "success"
-                ? "#2E7D32"
+                ? "#15803D"
                 : message.type === "error"
-                ? "#C62828"
+                ? "#B42318"
                 : message.type === "info"
-                ? "#0288D1"
-                : "#ED6C02"
+                ? "#1E4FC2"
+                : "#B45309"
             }
           />
           <Text
@@ -154,12 +154,12 @@ function RequestScreen() {
               {
                 color:
                   message.type === "success"
-                    ? "#2E7D32"
+                    ? "#15803D"
                     : message.type === "error"
-                    ? "#C62828"
+                    ? "#B42318"
                     : message.type === "info"
-                    ? "#0288D1"
-                    : "#ED6C02",
+                    ? "#1E4FC2"
+                    : "#B45309",
               },
             ]}
           >
@@ -282,11 +282,11 @@ function HistoryScreen() {
   const getStatusColor = (status) => {
     switch (status) {
       case "approved":
-        return "#2E7D32"; // green
+        return "#15803D"; // green
       case "pending":
-        return "#ED6C02"; // orange
+        return "#B45309"; // orange
       case "rejected":
-        return "#C62828"; // red
+        return "#B42318"; // red
       default:
         return "#333";
     }
@@ -325,7 +325,7 @@ export default function RequestTabs() {
   return (
     <Tab.Navigator 
       screenOptions={{
-        tabBarIndicatorStyle: { backgroundColor: '#4a90e2' },
+        tabBarIndicatorStyle: { backgroundColor: '#1E4FC2' },
         tabBarLabelStyle: { fontWeight: '600' },
       }}
     >
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   activeType: {
-    backgroundColor: "#4a90e2",
+    backgroundColor: "#1E4FC2",
   },
   typeText: {
     color: "#333",
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   submitButton: {
-    backgroundColor: "#4a90e2",
+    backgroundColor: "#1E4FC2",
     padding: 14,
     borderRadius: 6,
     alignItems: "center",
@@ -445,9 +445,9 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 20,
   },
-  success: { backgroundColor: "#DFF6E0" }, // light green
-  error: { backgroundColor: "#FDE2E1" }, // light red
-  info: { backgroundColor: "#E0F2FE" }, // light blue
-  warning: { backgroundColor: "#FFF4E5" }, // light yellow
+  success: { backgroundColor: "#EAF6EE" }, // light green
+  error: { backgroundColor: "#FDEEEC" }, // light red
+  info: { backgroundColor: "#EEF3FC" }, // light blue
+  warning: { backgroundColor: "#FEF6E7" }, // light yellow
   messageText: { marginLeft: 8, fontSize: 15, fontWeight: "600" },
 });

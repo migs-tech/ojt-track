@@ -1,41 +1,31 @@
-// Notifications list shared by trainees and supervisors (the "Mail" tab).
+// Notifications list shared by trainees and supervisors (the "Inbox" tab).
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  Alert,
-  FlatList,
-  Modal,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Alert, FlatList, Modal, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNowStrict } from 'date-fns';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { notify } from '@/lib/notify';
-
-const BLUE = '#2076cc';
+import { Button, Empty, T, colors, radius, space } from '@/ui';
 
 // "2026-09-24 08:01:00" (server time) -> Date
-const parse = (v) => (v ? new Date(String(v).replace(' ', 'T')) : null);
+const parse = (v) => {
+  const d = v ? new Date(String(v).replace(' ', 'T')) : null;
+  return d && !isNaN(d) ? d : null;
+};
 
 const iconFor = (n) => {
   const text = `${n.type || ''} ${n.title || ''}`.toLowerCase();
-  if (text.includes('otp') || text.includes('code')) return ['key-outline', '#7c3aed'];
-  if (text.includes('report')) return ['document-text-outline', '#0891b2'];
-  if (text.includes('attendance') || text.includes('time')) return ['time-outline', '#d97706'];
-  if (text.includes('request') || text.includes('supervisor') || text.includes('trainee')) return ['people-outline', '#059669'];
-  if (text.includes('quote')) return ['sunny-outline', '#f59e0b'];
-  return ['notifications-outline', BLUE];
+  if (text.includes('otp') || text.includes('code')) return 'key-outline';
+  if (text.includes('report')) return 'document-text-outline';
+  if (text.includes('attendance') || text.includes('time')) return 'time-outline';
+  if (text.includes('request') || text.includes('supervisor') || text.includes('trainee')) return 'people-outline';
+  return 'notifications-outline';
 };
 
 export default function NotificationsScreen() {
-  const { notifications, getNotification, markAsReadById, markAllAsRead, deleteNotificationById } =
-    useNotificationStore();
+  const { notifications, getNotification, markAsReadById, markAllAsRead, deleteNotificationById } = useNotificationStore();
   const [tab, setTab] = useState('All');
   const [loaded, setLoaded] = useState(notifications !== null);
   const [refreshing, setRefreshing] = useState(false);
@@ -66,7 +56,7 @@ export default function NotificationsScreen() {
   };
 
   const remove = (n) => {
-    Alert.alert('Delete notification?', n.title, [
+    Alert.alert('Delete this notification?', n.title, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -81,48 +71,43 @@ export default function NotificationsScreen() {
 
   const code = selected ? (String(selected.message || '').match(/\b(\d{6})\b/) || [])[1] : null;
 
-  const renderItem = ({ item }) => {
-    const [icon, color] = iconFor(item);
+  const renderItem = ({ item, index }) => {
     const isUnread = !Number(item.is_read);
     const when = parse(item.created_at);
     return (
-      <TouchableOpacity style={[styles.item, isUnread && styles.itemUnread]} onPress={() => open(item)}>
-        <View style={[styles.itemIcon, { backgroundColor: color + '1a' }]}>
-          <Ionicons name={icon} size={20} color={color} />
-        </View>
+      <Pressable
+        onPress={() => open(item)}
+        style={({ pressed }) => [styles.item, index === 0 && styles.first, index === list.length - 1 && styles.last, pressed && { backgroundColor: colors.background }]}
+      >
+        <Ionicons name={iconFor(item)} size={20} color={isUnread ? colors.primary : colors.subtle} style={{ marginTop: 2 }} />
         <View style={{ flex: 1 }}>
           <View style={styles.itemTop}>
-            <Text style={[styles.itemTitle, isUnread && { fontWeight: '700' }]} numberOfLines={1}>
-              {item.title}
-            </Text>
-            {isUnread ? <View style={styles.dot} /> : null}
+            <T v={isUnread ? 'bodyStrong' : 'body'} style={{ flex: 1, color: colors.ink }} numberOfLines={1}>{item.title}</T>
+            {when ? <T v="caption">{formatDistanceToNowStrict(when)}</T> : null}
           </View>
-          <Text style={styles.itemBody} numberOfLines={2}>{item.message}</Text>
-          {when && !isNaN(when) ? (
-            <Text style={styles.itemTime}>{formatDistanceToNow(when, { addSuffix: true })}</Text>
-          ) : null}
+          <T v="caption" numberOfLines={2} style={{ color: isUnread ? colors.text : colors.muted }}>{item.message}</T>
         </View>
-      </TouchableOpacity>
+        {isUnread ? <View style={styles.dot} /> : null}
+      </Pressable>
     );
   };
 
   return (
-    <View style={styles.container}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={styles.toolbar}>
         <View style={styles.tabs}>
           {['All', 'Unread'].map((t) => (
             <Pressable key={t} onPress={() => setTab(t)} style={[styles.tab, tab === t && styles.tabActive]}>
-              <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-                {t}
-                {t === 'Unread' && unread ? ` (${unread})` : ''}
-              </Text>
+              <T v="label" style={{ color: tab === t ? colors.ink : colors.muted }}>
+                {t}{t === 'Unread' && unread ? ` · ${unread}` : ''}
+              </T>
             </Pressable>
           ))}
         </View>
         {unread > 0 ? (
-          <TouchableOpacity onPress={markAllAsRead} hitSlop={8}>
-            <Text style={styles.link}>Mark all read</Text>
-          </TouchableOpacity>
+          <Pressable onPress={markAllAsRead} hitSlop={8}>
+            <T v="label" style={{ color: colors.primary }}>Mark all read</T>
+          </Pressable>
         ) : null}
       </View>
 
@@ -130,62 +115,45 @@ export default function NotificationsScreen() {
         data={loaded ? list : []}
         keyExtractor={(n) => String(n.id)}
         renderItem={renderItem}
-        contentContainerStyle={{ padding: 16, paddingTop: 4, flexGrow: 1 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[BLUE]} />}
+        contentContainerStyle={{ padding: space.lg, paddingTop: 0, flexGrow: 1 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
         ListEmptyComponent={
-          !loaded ? (
-            <View>
-              {[0, 1, 2, 3].map((i) => (
-                <View key={i} style={[styles.item, { opacity: 0.5 }]}>
-                  <View style={[styles.itemIcon, { backgroundColor: '#e2e8f0' }]} />
-                  <View style={{ flex: 1, gap: 8 }}>
-                    <View style={styles.skel} />
-                    <View style={[styles.skel, { width: '80%' }]} />
-                  </View>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <View style={styles.empty}>
-              <Ionicons name="notifications-off-outline" size={48} color="#cbd5e1" />
-              <Text style={styles.emptyTitle}>{tab === 'Unread' ? "You're all caught up" : 'No notifications yet'}</Text>
-              <Text style={styles.emptyText}>Updates about attendance, reports and requests show up here.</Text>
-            </View>
-          )
+          loaded ? (
+            <Empty
+              icon="notifications-off-outline"
+              title={tab === 'Unread' ? "You're all caught up" : 'No notifications yet'}
+              text="Updates about attendance, reports and requests appear here."
+            />
+          ) : null
         }
       />
 
       <Modal visible={!!selected} transparent animationType="slide" onRequestClose={() => setSelected(null)}>
-        <View style={styles.sheetOverlay}>
+        <View style={styles.overlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setSelected(null)} />
           {selected ? (
             <View style={styles.sheet}>
               <View style={styles.handle} />
-              <Text style={styles.sheetTitle}>{selected.title}</Text>
+              <T v="title">{selected.title}</T>
               {parse(selected.created_at) ? (
-                <Text style={styles.itemTime}>{parse(selected.created_at).toLocaleString()}</Text>
+                <T v="caption" style={{ marginTop: 2 }}>{parse(selected.created_at).toLocaleString()}</T>
               ) : null}
-              <Text style={styles.sheetBody}>{selected.message}</Text>
+              <T v="body" style={{ marginTop: space.lg }}>{selected.message}</T>
               {code ? (
-                <TouchableOpacity
+                <Pressable
                   style={styles.codeBox}
                   onPress={async () => {
                     await Clipboard.setStringAsync(code);
                     notify.info('Copied', `Code ${code} copied.`);
                   }}
                 >
-                  <Text style={styles.codeText}>{code}</Text>
-                  <Text style={styles.itemTime}>Tap to copy</Text>
-                </TouchableOpacity>
+                  <T v="display" style={{ letterSpacing: 6, fontVariant: ['tabular-nums'] }}>{code}</T>
+                  <T v="caption">Tap to copy</T>
+                </Pressable>
               ) : null}
-              <View style={styles.sheetActions}>
-                <TouchableOpacity style={styles.deleteBtn} onPress={() => remove(selected)}>
-                  <Ionicons name="trash-outline" size={18} color="#dc2626" />
-                  <Text style={{ color: '#dc2626', fontWeight: '600' }}>Delete</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.closeBtn} onPress={() => setSelected(null)}>
-                  <Text style={{ color: '#fff', fontWeight: '700' }}>Close</Text>
-                </TouchableOpacity>
+              <View style={styles.actions}>
+                <Button title="Delete" variant="dangerOutline" icon="trash-outline" onPress={() => remove(selected)} style={{ flex: 1 }} />
+                <Button title="Done" onPress={() => setSelected(null)} style={{ flex: 1 }} />
               </View>
             </View>
           ) : null}
@@ -196,66 +164,27 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f7fb' },
-  toolbar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 10,
-  },
-  tabs: { flexDirection: 'row', backgroundColor: '#e2e8f0', borderRadius: 10, padding: 3 },
-  tab: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 8 },
-  tabActive: { backgroundColor: '#fff' },
-  tabText: { color: '#64748b', fontWeight: '600' },
-  tabTextActive: { color: '#0f172a' },
-  link: { color: BLUE, fontWeight: '600' },
+  toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.lg, paddingVertical: space.md },
+  tabs: { flexDirection: 'row', backgroundColor: '#ECEEF2', borderRadius: radius.md, padding: 3 },
+  tab: { paddingVertical: 6, paddingHorizontal: space.lg, borderRadius: radius.sm },
+  tabActive: { backgroundColor: colors.surface },
   item: {
     flexDirection: 'row',
-    gap: 12,
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
+    gap: space.md,
+    backgroundColor: colors.surface,
+    paddingVertical: 14,
+    paddingHorizontal: space.lg,
+    borderWidth: 1,
+    borderTopWidth: 0,
+    borderColor: colors.border,
   },
-  itemUnread: { backgroundColor: '#f0f7ff' },
-  itemIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  itemTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  itemTitle: { flex: 1, fontSize: 15, fontWeight: '600', color: '#0f172a' },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: BLUE },
-  itemBody: { fontSize: 13, color: '#475569', marginTop: 2, lineHeight: 18 },
-  itemTime: { fontSize: 12, color: '#94a3b8', marginTop: 4 },
-  skel: { height: 12, borderRadius: 6, backgroundColor: '#e2e8f0' },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
-  emptyTitle: { fontSize: 17, fontWeight: '700', color: '#334155' },
-  emptyText: { fontSize: 13, color: '#94a3b8', textAlign: 'center' },
-  sheetOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15,23,42,0.45)' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 32 },
-  handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: '#cbd5e1', marginBottom: 14 },
-  sheetTitle: { fontSize: 19, fontWeight: '700', color: '#0f172a' },
-  sheetBody: { fontSize: 15, color: '#334155', marginTop: 12, lineHeight: 22 },
-  codeBox: {
-    marginTop: 16,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#c7d2fe',
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    padding: 12,
-  },
-  codeText: { fontSize: 28, fontWeight: '800', letterSpacing: 6, color: '#4338ca' },
-  sheetActions: { flexDirection: 'row', gap: 12, marginTop: 22 },
-  deleteBtn: {
-    flexDirection: 'row',
-    gap: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#fecaca',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-  },
-  closeBtn: { flex: 1, backgroundColor: BLUE, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  first: { borderTopWidth: 1, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg },
+  last: { borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg },
+  itemTop: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginBottom: 2 },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary, marginTop: 8 },
+  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(17,24,39,0.45)' },
+  sheet: { backgroundColor: colors.surface, borderTopLeftRadius: radius.xl + 4, borderTopRightRadius: radius.xl + 4, padding: space.xl, paddingBottom: space.xxxl },
+  handle: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: space.lg },
+  codeBox: { marginTop: space.lg, alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: space.md, backgroundColor: colors.background },
+  actions: { flexDirection: 'row', gap: space.md, marginTop: space.xl },
 });

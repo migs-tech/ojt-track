@@ -149,12 +149,12 @@ const OJTCompletionScreen = () => {
           size={22}
           color={
             message.type === "success"
-              ? "#2E7D32"
+              ? "#15803D"
               : message.type === "error"
-              ? "#C62828"
+              ? "#B42318"
               : message.type === "info"
-              ? "#0288D1"
-              : "#ED6C02"
+              ? "#1E4FC2"
+              : "#B45309"
           }
         />
         <Text style={styles.messageText}>
@@ -256,7 +256,7 @@ const OJTCompletionScreen = () => {
         <Checkbox
           value={confirm}
           onValueChange={setConfirm}
-          color={confirm ? "#3a5bc0ff" : undefined}
+          color={confirm ? "#1E4FC2" : undefined}
           disabled={submitted} // 🔒 lock if already submitted
         />
         <Text style={styles.checkboxText}>
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     flex: 1, 
     paddingTop: 16,
     paddingHorizontal: 16, 
-    backgroundColor: "#f8f9fa" },
+    backgroundColor: "#F6F7F9" },
   title: {
     fontSize: 22,
     fontWeight: "bold",
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
   },
   checkboxText: { marginLeft: 8, flex: 1, fontSize: 14, color: "#333" },
   submitButton: {
-    backgroundColor: "#3a5bc0ff",
+    backgroundColor: "#1E4FC2",
     padding: 14,
     borderRadius: 8,
     alignItems: "center",
@@ -379,9 +379,9 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 20,
   },
-  success: { backgroundColor: "#DFF6E0" }, // light green
-  error: { backgroundColor: "#FDE2E1" }, // light red
-  info: { backgroundColor: "#E0F2FE" }, // light blue
-  warning: { backgroundColor: "#FFF4E5" }, // light yellow
+  success: { backgroundColor: "#EAF6EE" }, // light green
+  error: { backgroundColor: "#FDEEEC" }, // light red
+  info: { backgroundColor: "#EEF3FC" }, // light blue
+  warning: { backgroundColor: "#FEF6E7" }, // light yellow
   messageText: { marginLeft: 8, fontSize: 15, fontWeight: "600" },
 });

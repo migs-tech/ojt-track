@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   saveButton: {
-    backgroundColor: "#007bff",
+    backgroundColor: "#1E4FC2",
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: "center",
@@ -300,12 +300,12 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   successBox: {
-    backgroundColor: "#E6F4EA",
+    backgroundColor: "#EAF6EE",
     borderColor: "green",
     borderWidth: 1,
   },
   errorBox: {
-    backgroundColor: "#FDECEA",
+    backgroundColor: "#FDEEEC",
     borderColor: "red",
     borderWidth: 1,
   },

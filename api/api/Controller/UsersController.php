@@ -76,9 +76,9 @@ class UsersController {
             $requiredHours = ($role == 1) ? 486 : null;
             $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
 
-            // Trainees give their course and OJT start date; supervisors give their company (study, Figure 4.1).
+            // Trainees give their course and OJT start date (and their company if known); supervisors give their company (study, Figure 4.1).
             $course    = $role === Access::TRAINEE ? mb_substr(trim((string) ($params['data']['course'] ?? '')), 0, 255) : '';
-            $company   = $role === Access::SUPERVISOR ? mb_substr(trim((string) ($params['data']['company'] ?? '')), 0, 255) : '';
+            $company   = in_array($role, [Access::TRAINEE, Access::SUPERVISOR], true) ? mb_substr(trim((string) ($params['data']['company'] ?? '')), 0, 255) : '';
             $startedAt = null;
             if ($role === Access::TRAINEE && !empty($params['data']['started_at'])) {
                 $ts = strtotime((string) $params['data']['started_at']);
@@ -1019,7 +1019,7 @@ class UsersController {
             $stmt = $this->conn->prepare(
                 "SELECT st.*, 
                         COALESCE(NULLIF(u.complete_name, ''), u.username) AS trainee_name, 
-                        u.email AS trainee_email 
+                        u.email AS trainee_email, u.avatar_url, u.course 
                  FROM supervisor_trainees st
                  JOIN users u ON st.trainee_id = u.id
                  WHERE st.supervisor_id = :user_id"
@@ -1790,7 +1790,8 @@ class UsersController {
 
         $stmt = $this->conn->prepare(
             "SELECT COALESCE(NULLIF(complete_name, ''), username) AS complete_name, username, email, birthdate, avatar_url,
-                    role, email_flg, course, company, started_at, ojt_required_hours
+                    role, email_flg, course, company, started_at, ojt_required_hours,
+                    NULLIF(complete_name, '') AS full_name
              FROM users WHERE id = :id"
         );
         $stmt->execute(['id' => $userId]);

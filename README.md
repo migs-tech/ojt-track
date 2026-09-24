@@ -2,9 +2,15 @@
 
 A full-stack **On-the-Job Training (OJT) tracking system** for trainees and supervisors. Trainees log attendance by scanning a QR code, submit reports, and track their required hours. Supervisors manage trainees, review reports, and fill out evaluations. The system includes a web dashboard, a mobile app, and a REST API.
 
-### ▶ [Live demo](https://migs-tech.github.io/ojt-track/)
+### Live
 
-Click **Try the live demo** and sign in with the demo account, which is already filled in. The demo runs the real Vue dashboard against sample data in your browser, so there's no backend and no real student data. Changes reset when you reload.
+| | |
+|---|---|
+| **Website** (admins and coordinators) | https://ojt-track-tau.vercel.app |
+| **Android app** (trainees and supervisors) | [Download the APK](https://ojt-track-tau.vercel.app/download) · [Releases](https://github.com/migs-tech/ojt-track/releases) |
+| **Portfolio demo** (sample data, no sign-up) | https://migs-tech.github.io/ojt-track/ |
+
+The demo runs the real Vue dashboard against sample data in your browser, so there's no backend and no real student data. The demo account is already filled in, and changes reset when you reload.
 
 ![Admin dashboard](docs/screenshots/dashboard.png)
 
@@ -14,13 +20,13 @@ Click **Try the live demo** and sign in with the demo account, which is already 
 
 ## Features
 
-- **QR attendance**: trainees show a QR code, and supervisors scan it to log time in and time out
+- **QR attendance**: trainees get a one-time code by email, show a QR code, and supervisors scan it to record the time-in; trainees time out in the app
 - **Hours tracking**: running totals toward each trainee's required OJT hours, with completion status
 - **Reports**: trainees submit reports, supervisors review them, and weekly reports are generated automatically
-- **AI assistant**: an in-app assistant powered by OpenAI
+- **AI assistant**: an in-app assistant and report summaries through any OpenAI-compatible API (Google Gemini's free tier by default)
 - **Evaluations**: supervisors fill out structured evaluations for their trainees
 - **Supervisor–trainee requests**: trainees and supervisors send and accept requests to link up
-- **Notifications**: Expo push notifications and email notifications (PHPMailer)
+- **Notifications**: in-app notifications, Expo push notifications, and email through Brevo (or SMTP with PHPMailer)
 - **Exports**: PDF and Excel reports (TCPDF, PhpSpreadsheet)
 - **Auth**: role-based login for trainees, supervisors and admins, with email verification, password reset, OTP and reCAPTCHA
 - **Dashboard**: attendance charts and trainee overviews (Chart.js)

@@ -71,7 +71,7 @@ export default function RequestTraineeScreen() {
       contentContainerStyle={{ padding: 16, flexGrow: 1 }}
       data={list}
       keyExtractor={(item) => String(item.id)}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#2076cc"]} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#1E4FC2"]} />}
       ListHeaderComponent={
         list.length ? (
           <Text style={styles.header}>
@@ -89,11 +89,11 @@ export default function RequestTraineeScreen() {
             ) : null}
           </View>
           {working === item.id ? (
-            <ActivityIndicator color="#2076cc" />
+            <ActivityIndicator color="#1E4FC2" />
           ) : (
             <View style={styles.actions}>
               <TouchableOpacity style={[styles.btn, styles.declineBtn]} onPress={() => decline(item)} disabled={working !== null}>
-                <Ionicons name="close" size={20} color="#dc2626" />
+                <Ionicons name="close" size={20} color="#B42318" />
               </TouchableOpacity>
               <TouchableOpacity style={[styles.btn, styles.acceptBtn]} onPress={() => respond(item, 1)} disabled={working !== null}>
                 <Ionicons name="checkmark" size={20} color="#fff" />
@@ -104,7 +104,7 @@ export default function RequestTraineeScreen() {
       )}
       ListEmptyComponent={
         <View style={styles.empty}>
-          <Ionicons name="people-outline" size={48} color="#cbd5e1" />
+          <Ionicons name="people-outline" size={48} color="#D1D5DB" />
           <Text style={styles.emptyTitle}>No requests right now</Text>
           <Text style={styles.emptyText}>When a trainee chooses you as their supervisor, they appear here.</Text>
         </View>
@@ -114,8 +114,8 @@ export default function RequestTraineeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f5f7fb" },
-  header: { fontSize: 14, color: "#64748b", marginBottom: 12 },
+  container: { flex: 1, backgroundColor: "#F6F7F9" },
+  header: { fontSize: 14, color: "#6B7280", marginBottom: 12 },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -125,13 +125,13 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginBottom: 10,
   },
-  name: { fontSize: 16, fontWeight: "600", color: "#0f172a" },
-  sub: { fontSize: 13, color: "#64748b", marginTop: 2 },
+  name: { fontSize: 16, fontWeight: "600", color: "#111827" },
+  sub: { fontSize: 13, color: "#6B7280", marginTop: 2 },
   actions: { flexDirection: "row", gap: 10 },
   btn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   declineBtn: { borderWidth: 1.5, borderColor: "#fecaca" },
-  acceptBtn: { backgroundColor: "#16a34a" },
+  acceptBtn: { backgroundColor: "#15803D" },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 8 },
-  emptyTitle: { fontSize: 17, fontWeight: "700", color: "#334155" },
-  emptyText: { fontSize: 13, color: "#94a3b8", textAlign: "center" },
+  emptyTitle: { fontSize: 17, fontWeight: "700", color: "#374151" },
+  emptyText: { fontSize: 13, color: "#9CA3AF", textAlign: "center" },
 });

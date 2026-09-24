@@ -8,7 +8,6 @@ import {
 } from "react-native";
 import { useRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import useTraineeStore from "@/store/useTraineeStore";
 
 export default function AttendanceDetails() {
@@ -72,10 +71,7 @@ export default function AttendanceDetails() {
   return (
     <View style={styles.container}>
       {/* Header with Gradient */}
-      <LinearGradient
-        colors={['#2563EB', '#1D4ED8']}
-        style={styles.header}
-      >
+      <View style={[styles.header, { backgroundColor: "#1E4FC2" }]}>
         <View style={styles.headerContent}>
           <Ionicons name="calendar" size={32} color="#fff" />
           <View style={styles.headerTextContainer}>
@@ -92,27 +88,27 @@ export default function AttendanceDetails() {
           </View>
           
           <View style={styles.statCard}>
-            <Text style={[styles.statValue, { color: '#10B981' }]}>
+            <Text style={[styles.statValue, { color: '#15803D' }]}>
               {presentTrainees.length}
             </Text>
             <Text style={styles.statLabel}>Present</Text>
           </View>
           
           <View style={styles.statCard}>
-            <Text style={[styles.statValue, { color: '#EF4444' }]}>
+            <Text style={[styles.statValue, { color: '#B42318' }]}>
               {absentTrainees.length}
             </Text>
             <Text style={styles.statLabel}>Absent</Text>
           </View>
           
           <View style={styles.statCard}>
-            <Text style={[styles.statValue, { color: '#2563EB' }]}>
+            <Text style={[styles.statValue, { color: '#1E4FC2' }]}>
               {attendanceRate}%
             </Text>
             <Text style={styles.statLabel}>Rate</Text>
           </View>
         </View>
-      </LinearGradient>
+      </View>
 
       <ScrollView
         style={styles.scrollView}
@@ -124,7 +120,7 @@ export default function AttendanceDetails() {
           <View style={styles.sectionHeader}>
             <View style={styles.sectionHeaderLeft}>
               <View style={styles.sectionIconContainer}>
-                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                <Ionicons name="checkmark-circle" size={20} color="#15803D" />
               </View>
               <Text style={styles.sectionTitle}>
                 Present Trainees
@@ -156,7 +152,7 @@ export default function AttendanceDetails() {
           <View style={styles.sectionHeader}>
             <View style={styles.sectionHeaderLeft}>
               <View style={styles.sectionIconContainer}>
-                <Ionicons name="close-circle" size={20} color="#EF4444" />
+                <Ionicons name="close-circle" size={20} color="#B42318" />
               </View>
               <Text style={styles.sectionTitle}>
                 Absent Trainees
@@ -192,7 +188,7 @@ export default function AttendanceDetails() {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: "#F3F4F6" 
+    backgroundColor: "#F6F7F9" 
   },
 
   // Header
@@ -220,7 +216,7 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 14,
-    color: "#E0E7FF",
+    color: "#EEF3FC",
     fontWeight: '500',
   },
 
@@ -247,7 +243,7 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 11,
-    color: '#E0E7FF',
+    color: '#EEF3FC',
     fontWeight: '600',
   },
 
@@ -296,7 +292,7 @@ const styles = StyleSheet.create({
     color: "#111827",
   },
   countBadge: {
-    backgroundColor: '#2563EB',
+    backgroundColor: '#1E4FC2',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -325,12 +321,12 @@ const styles = StyleSheet.create({
   presentCard: {
     backgroundColor: "#fff",
     borderLeftWidth: 4,
-    borderLeftColor: '#10B981',
+    borderLeftColor: '#15803D',
   },
   absentCard: {
     backgroundColor: "#fff",
     borderLeftWidth: 4,
-    borderLeftColor: '#EF4444',
+    borderLeftColor: '#B42318',
   },
   traineeContent: {
     flexDirection: 'row',
@@ -348,10 +344,10 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   presentIndicator: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#15803D',
   },
   absentIndicator: {
-    backgroundColor: '#EF4444',
+    backgroundColor: '#B42318',
   },
 
   // Trainee Info
@@ -386,17 +382,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#ECFDF5',
   },
   absentBadge: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#FDEEEC',
   },
   statusBadgeText: {
     fontSize: 12,
     fontWeight: '700',
   },
   presentBadgeText: {
-    color: '#10B981',
+    color: '#15803D',
   },
   absentBadgeText: {
-    color: '#EF4444',
+    color: '#B42318',
   },
 
   // Empty State

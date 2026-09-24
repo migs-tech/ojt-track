@@ -15,33 +15,28 @@ import SupervisorEvaluation from '@/screens/Teacher/SupervisorEvaluation';
 import EvaluationPage from '@/screens/Teacher/EvaluationPage';
 import Instructions from '@/screens/Teacher/Instructions';
 
+import { headerOptions } from '@/ui/theme';
+
 const Stack = createNativeStackNavigator();
 
 export default function TeacherStack() {
   return (
      <Stack.Navigator
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: '#3a5bc0ff',
-        },
-        headerTintColor: '#fff', // white text
-        presentation: 'card',
-        animation: 'slide_from_right',
-      }}
+      screenOptions={{ ...headerOptions, animation: 'slide_from_right' }}
     >
       <Stack.Screen name="TeacherTabs" component={TeacherTabs} options={{ headerShown: false }} />
-       <Stack.Screen name="ScanQrCode" component={ScanQrCode} options={{ title: 'QR Code' }} />
-      <Stack.Screen name="AttendanceDetails" component={AttendanceDetails} options={{ title: 'Attendance Details' }} />
-      <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ title: 'Edit Profile' }} />
-      <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: 'Change Password' }} />
-      <Stack.Screen name="ManageNotifications" component={ManageNotificationsScreen} options={{ title: 'Manage Notifications' }} />
-      <Stack.Screen name="TraineeDetails" component={TraineeDetailsScreen} options={{ title: 'Trainee Details', presentation: "card", animation: "slide_from_right" }} />
-      <Stack.Screen name="ReportDetails" component={ReportDetailsScreen} options={{ title: 'Report Details', presentation: "card", animation: "slide_from_right" }} />
-      <Stack.Screen name="RequestTrainee" component={RequestTraineeScreen} options={{ title: 'Request Trainee', presentation: "card", animation: "slide_from_right" }} />
-      <Stack.Screen name="TraineeReportList" component={TraineeReportList} options={{ title: 'Trainee Reports', presentation: "card", animation: "slide_from_right" }} />
-      <Stack.Screen name="SupervisorEvaluation" component={SupervisorEvaluation} options={{ title: 'Evaluate Trainee', presentation: "card", animation: "slide_from_right" }} />
-      <Stack.Screen name="EvaluationPage" component={EvaluationPage} options={{ title: 'Evaluation Page', presentation: "card", animation: "slide_from_right" }} />
-      <Stack.Screen name="Instructions" component={Instructions} options={{ title: 'Instructions', presentation: "card", animation: "slide_from_right" }} />
+       <Stack.Screen name="ScanQrCode" component={ScanQrCode} options={{ title: 'Scan QR code', headerShown: false }} />
+      <Stack.Screen name="AttendanceDetails" component={AttendanceDetails} options={{ title: 'Attendance' }} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ title: 'Edit profile' }} />
+      <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: 'Change password' }} />
+      <Stack.Screen name="ManageNotifications" component={ManageNotificationsScreen} options={{ title: 'Notification settings' }} />
+      <Stack.Screen name="TraineeDetails" component={TraineeDetailsScreen} options={{ title: 'Trainee' }} />
+      <Stack.Screen name="ReportDetails" component={ReportDetailsScreen} options={{ title: 'Report' }} />
+      <Stack.Screen name="RequestTrainee" component={RequestTraineeScreen} options={{ title: 'Trainee requests' }} />
+      <Stack.Screen name="TraineeReportList" component={TraineeReportList} options={{ title: 'Reports' }} />
+      <Stack.Screen name="SupervisorEvaluation" component={SupervisorEvaluation} options={{ title: 'Midterm / final evaluation' }} />
+      <Stack.Screen name="EvaluationPage" component={EvaluationPage} options={{ title: 'Evaluation form' }} />
+      <Stack.Screen name="Instructions" component={Instructions} options={{ title: 'How it works' }} />
     </Stack.Navigator>
   );
 }

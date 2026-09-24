@@ -16,7 +16,8 @@ class TraineeController {
 
         // get trainee details
         $stmt = $this->conn->prepare("
-            SELECT id, COALESCE(NULLIF(complete_name, ''), username) AS trainee_name, email, avatar_url
+            SELECT id, COALESCE(NULLIF(complete_name, ''), username) AS trainee_name, email, avatar_url,
+                   course, company, started_at, ojt_required_hours
             FROM users 
             WHERE id = :id
         ");
@@ -335,9 +336,10 @@ class TraineeController {
             $sql = "
                 SELECT 
                     st.trainee_id,
-                    COALESCE(u.complete_name, u.username) AS trainee_name,
+                    COALESCE(NULLIF(u.complete_name, ''), u.username) AS trainee_name,
                     u.avatar_url,
                     st.assigned_at,
+                    (SELECT COUNT(*) FROM reports rc WHERE rc.user_id = st.trainee_id) AS report_count,
                     COALESCE(
                         JSON_ARRAYAGG(
                             CASE 
@@ -353,7 +355,6 @@ class TraineeController {
                                     'files', COALESCE(rf.files, JSON_ARRAY())
                                 )
                             END
-                            ORDER BY r.date DESC, r.created_at DESC
                         ),
                         JSON_ARRAY()
                     ) AS reports

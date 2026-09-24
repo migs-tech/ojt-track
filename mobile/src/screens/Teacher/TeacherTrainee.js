@@ -1,75 +1,16 @@
-import React, { useState, useEffect, useRef } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  Modal,
-  Animated,
-  TextInput,
-  Alert,
-  Image,
-  RefreshControl,
-} from "react-native";
-import { FAB } from "react-native-paper";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import { Ionicons, MaterialIcons, Feather } from "@expo/vector-icons";
-import useTraineeStore from "@/store/useTraineeStore";
-
-function SkeletonRow({ width1 = "50%", width2 = "30%", showBadges = false }) {
-  const shimmer = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(shimmer, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: false,
-        }),
-        Animated.timing(shimmer, {
-          toValue: 0,
-          duration: 800,
-          useNativeDriver: false,
-        }),
-      ])
-    ).start();
-  }, [shimmer]);
-
-  const bgColor = shimmer.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["#e5e7eb", "#f3f4f6"],
-  });
-
-  return (
-    <View style={styles.row}>
-      <Animated.View
-        style={[styles.skeletonLine, { width: width1, backgroundColor: bgColor }]}
-      />
-      <Animated.View
-        style={[
-          styles.skeletonLine,
-          { width: width2, marginTop: 8, backgroundColor: bgColor },
-        ]}
-      />
-      {showBadges && (
-        <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
-          <Animated.View
-            style={[styles.skeletonBadge, { width: 80, backgroundColor: bgColor }]}
-          />
-          <Animated.View
-            style={[styles.skeletonBadge, { width: 80, backgroundColor: bgColor }]}
-          />
-        </View>
-      )}
-    </View>
-  );
-}
+// Supervisor "Trainees" tab: your trainees, and attendance by day.
+import React, { useCallback, useMemo, useState } from 'react';
+import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { format } from 'date-fns';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import useTraineeStore from '@/store/useTraineeStore';
+import { errorMessage } from '@/lib/api';
+import { notify } from '@/lib/notify';
+import Avatar from '@/components/Avatar';
+import { Card, Empty, Field, Loading, Row, T, colors, radius, space } from '@/ui';
 
 export default function TeacherTraineeScreen() {
-  const [activeTab, setActiveTab] = useState("trainee");
-  const [searchQuery, setSearchQuery] = useState("");
   const navigation = useNavigation();
   const {
     trainees,
@@ -78,514 +19,200 @@ export default function TeacherTraineeScreen() {
     attendanceRecords,
     fetchTraineeRequests,
     traineeRequests,
-    unEnrollTrainee,        // <-- ADD THIS
+    unEnrollTrainee,
   } = useTraineeStore();
-  const [showModal, setShowModal] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState(null);
+  const [tab, setTab] = useState('trainees');
+  const [search, setSearch] = useState('');
+  const [loaded, setLoaded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const showMessage = (text, type) => {
-    setMessage({ text, type });
-    setTimeout(() => setMessage(null), 3000);
-  };
+  const load = useCallback(async () => {
+    await Promise.all([fetchTrainees(), fetchAllAttendanceRecords(), fetchTraineeRequests()]);
+    setLoaded(true);
+  }, [fetchTrainees, fetchAllAttendanceRecords, fetchTraineeRequests]);
 
   useFocusEffect(
-    React.useCallback(() => {
-      fetchTraineeRequests();
-      fetchAllAttendanceRecords();
-      fetchTrainees();
-    }, [fetchTraineeRequests, fetchAllAttendanceRecords, fetchTrainees])
+    useCallback(() => {
+      load();
+    }, [load])
   );
 
-  // Remind about new requests once per visit, not on every refresh
-  const remindedRequests = useRef(false);
-  useEffect(() => {
-    if (traineeRequests.length > 0 && !remindedRequests.current) {
-      remindedRequests.current = true;
-      setShowModal(true);
-    }
-  }, [traineeRequests]);
-
-  const [refreshing, setRefreshing] = useState(false);
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchTrainees(), fetchAllAttendanceRecords(), fetchTraineeRequests()]);
+    await load();
     setRefreshing(false);
   };
-  const refreshControl = (
-    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#2076cc"]} />
+
+  const list = useMemo(
+    () =>
+      (Array.isArray(trainees) ? trainees : []).filter((t) =>
+        String(t.trainee_name || '').toLowerCase().includes(search.trim().toLowerCase())
+      ),
+    [trainees, search]
   );
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await Promise.all([fetchTrainees(), fetchAllAttendanceRecords()]);
-      setLoading(false);
-    };
-    loadData();
-  }, [fetchTrainees, fetchAllAttendanceRecords]);
-
-  const filteredTrainees = (trainees || []).filter((trainee) =>
-    String(trainee.trainee_name || "").toLowerCase().includes(searchQuery.toLowerCase())
+  const days = useMemo(
+    () =>
+      Object.entries(attendanceRecords?.attendance ?? {})
+        .map(([date, d]) => ({ date, present: d.present_count, absent: d.absent_count, trainees: d.trainees }))
+        .sort((a, b) => (a.date < b.date ? 1 : -1)),
+    [attendanceRecords]
   );
 
-  const formattedAttendance = Object.entries(
-    attendanceRecords?.attendance ?? {}
-  ).map(([date, data]) => ({
-    id: date,
-    date,
-    present: data.present_count,
-    absent: data.absent_count,
-    trainees: data.trainees,
-  }));
+  const requests = Array.isArray(traineeRequests) ? traineeRequests : [];
 
-  // ----------------------------------------
-  // DELETE CONFIRMATION
-  // ----------------------------------------
-  const confirmDelete = (id, name) => {
+  const unenroll = (t) => {
     Alert.alert(
-      "Unenroll Trainee",
-      `Are you sure you want to Unenroll this trainee: ${name}?`,
+      `Remove ${t.trainee_name}?`,
+      "They'll no longer be your trainee and will need to choose a supervisor again. Their past attendance and reports are kept.",
       [
-        { text: "Cancel", style: "cancel" },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => deleteTrainee(id),
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const res = await unEnrollTrainee(t.trainee_id);
+              if (res?.success) {
+                notify.success('Trainee removed', `${t.trainee_name} is no longer your trainee.`);
+                fetchTrainees();
+              } else {
+                notify.error("Couldn't remove", res?.error || res?.message || 'Please try again.');
+              }
+            } catch (e) {
+              notify.error("Couldn't remove", errorMessage(e));
+            }
+          },
         },
       ]
     );
   };
 
-  const deleteTrainee = async (id) => {
-    try {
-      const res = await unEnrollTrainee(id);  // <-- CALL THE STORE ACTION
+  if (!loaded) return <Loading />;
 
-      if (res.success) {
-        showMessage("Trainee removed successfully.", "success");
-        fetchTrainees(); // Refresh the trainee list
-      } else {
-        showMessage(res.error || "Failed to remove trainee.", "error");
-      }
-    } catch (error) {
-      showMessage("An error occurred. Please try again.", "error");
-    }
-  };
-      
+  const header = (
+    <View>
+      <View style={styles.segment}>
+        {[
+          ['trainees', `Trainees${Array.isArray(trainees) && trainees.length ? ` · ${trainees.length}` : ''}`],
+          ['attendance', 'Attendance'],
+        ].map(([key, label]) => (
+          <Pressable key={key} onPress={() => setTab(key)} style={[styles.segmentItem, tab === key && styles.segmentActive]}>
+            <T v="bodyStrong" style={{ color: tab === key ? colors.ink : colors.muted }}>{label}</T>
+          </Pressable>
+        ))}
+      </View>
 
-  // ----------------------------------------
-  // TRAINEE LIST ITEM
-  // ----------------------------------------
-  const renderTrainee = ({ item }) => (
-    <View style={styles.traineeCard}>
-      <TouchableOpacity
-        style={styles.cardHeader}
-        onPress={() => navigation.navigate("TraineeDetails", { item })}
-        activeOpacity={0.7}
-      >
-        <View style={styles.avatarPlaceholder}>
-          {item.avatar_url ? (
-            <Image
-              source={{ uri: item.avatar_url }}
-              style={{ width: 44, height: 44, borderRadius: 22 }}
-              resizeMode="cover"
-            />
-          ) : (
-            <Ionicons name="person" size={22} color="#007bff" />
-          )}
-        </View>
+      {requests.length > 0 ? (
+        <Card onPress={() => navigation.navigate('RequestTrainee')} style={styles.requests}>
+          <Ionicons name="person-add-outline" size={20} color={colors.primary} />
+          <T v="bodyStrong" style={{ flex: 1 }}>
+            {requests.length} pending {requests.length === 1 ? 'request' : 'requests'}
+          </T>
+          <T v="label" style={{ color: colors.primary }}>Review</T>
+        </Card>
+      ) : null}
 
-        <View style={styles.cardContent}>
-          <Text style={styles.traineeName}>{item.trainee_name}</Text>
-          <Text style={styles.cardSubtext}>Tap to view details</Text>
-        </View>
-      </TouchableOpacity>
-
-      {/* UNENROLL BUTTON */}
-      <TouchableOpacity
-        style={styles.deleteBtn}
-        onPress={() => confirmDelete(item.trainee_id, item.trainee_name)}
-        accessibilityLabel="Unenroll Trainee"
-      >
-        <MaterialIcons name="person-remove" size={22} color="#dc2626" />
-      </TouchableOpacity>
+      {tab === 'trainees' && Array.isArray(trainees) && trainees.length > 5 ? (
+        <Field
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search trainees"
+          autoCorrect={false}
+          right={search ? (
+            <Pressable onPress={() => setSearch('')} hitSlop={8}>
+              <Ionicons name="close-circle" size={18} color={colors.subtle} />
+            </Pressable>
+          ) : <Ionicons name="search" size={18} color={colors.subtle} />}
+          style={{ marginBottom: space.md }}
+        />
+      ) : null}
     </View>
   );
 
-  // ----------------------------------------
-  // ATTENDANCE LIST ITEM
-  // ----------------------------------------
-  const renderAttendance = ({ item }) => (
-    <TouchableOpacity
-      style={styles.attendanceCard}
-      onPress={() =>
-        navigation.navigate("AttendanceDetails", {
-          date: item.date,
-          trainees: item.trainees,
-        })
-      }
-      activeOpacity={0.7}
-    >
-      <View style={styles.attendanceCardContent}>
-        <Text style={styles.attendanceDate}>{item.date}</Text>
-        <View style={styles.badgeRow}>
-          <View style={[styles.badge, styles.presentBadge]}>
-            <Feather name="check-circle" size={14} color="#059669" />
-            <Text style={[styles.badgeText, { color: "#059669" }]}>
-              {item.present}
-            </Text>
-          </View>
-          <View style={[styles.badge, styles.absentBadge]}>
-            <Feather name="x-circle" size={14} color="#dc2626" />
-            <Text style={[styles.badgeText, { color: "#dc2626" }]}>
-              {item.absent}
-            </Text>
-          </View>
-        </View>
-      </View>
-      <MaterialIcons name="chevron-right" size={26} color="#007bff" />
-    </TouchableOpacity>
-  );
+  const refresh = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />;
 
-  // ----------------------------------------
-  // MAIN RENDER
-  // ----------------------------------------
+  if (tab === 'attendance') {
+    return (
+      <FlatList
+        style={styles.list}
+        contentContainerStyle={styles.content}
+        data={days}
+        keyExtractor={(d) => d.date}
+        refreshControl={refresh}
+        ListHeaderComponent={header}
+        renderItem={({ item, index }) => (
+          <Pressable
+            onPress={() => navigation.navigate('AttendanceDetails', { date: item.date, trainees: item.trainees })}
+            style={({ pressed }) => [styles.item, index === 0 && styles.first, index === days.length - 1 && styles.last, pressed && { backgroundColor: colors.background }]}
+          >
+            <View style={{ flex: 1 }}>
+              <T v="bodyStrong">{format(new Date(item.date + 'T00:00:00'), 'EEEE, MMM d')}</T>
+              <T v="caption">
+                {item.present} present{item.absent ? ` · ${item.absent} absent` : ''}
+              </T>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.subtle} />
+          </Pressable>
+        )}
+        ListEmptyComponent={<Empty icon="calendar-outline" title="No attendance yet" text="Days appear here after you scan your trainees' QR codes." />}
+      />
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      {message && (
-        <View style={[styles.toast, styles[message.type]]}>
-          <Ionicons
-            name={message.type === "success" ? "checkmark-circle" : "close-circle"}
-              size={22}
-              color="#fff"
-            />
-          <Text style={styles.toastText}>{message.text}</Text>
+    <FlatList
+      style={styles.list}
+      contentContainerStyle={styles.content}
+      data={list}
+      keyExtractor={(t) => String(t.trainee_id)}
+      refreshControl={refresh}
+      ListHeaderComponent={header}
+      renderItem={({ item, index }) => (
+        <View style={[styles.itemWrap, index === 0 && styles.first, index === list.length - 1 && styles.last]}>
+          <Row
+            left={<Avatar uri={item.avatar_url} name={item.trainee_name} size={40} />}
+            title={item.trainee_name}
+            subtitle={item.course || item.trainee_email}
+            onPress={() => navigation.navigate('TraineeDetails', { item })}
+            right={
+              <Pressable onPress={() => unenroll(item)} hitSlop={10} accessibilityLabel={`Remove ${item.trainee_name}`} style={{ padding: 4 }}>
+                <Ionicons name="ellipsis-vertical" size={18} color={colors.subtle} />
+              </Pressable>
+            }
+            last
+          />
         </View>
       )}
-      {/* Header */}
-      {/* <View style={styles.header}>
-        <Text style={styles.headerTitle}>Trainees</Text>
-      </View> */}
-
-      {/* Tabs */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "trainee" && styles.activeTab]}
-          onPress={() => {
-            setActiveTab("trainee");
-            setSearchQuery("");
-          }}
-        >
-          <Feather
-            name="users"
-            size={16}
-            color={activeTab === "trainee" ? "#fff" : "#6b7280"}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "trainee" && styles.activeTabText,
-            ]}
-          >
-            Trainee List
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "attendance" && styles.activeTab]}
-          onPress={() => setActiveTab("attendance")}
-        >
-          <Feather
-            name="calendar"
-            size={16}
-            color={activeTab === "attendance" ? "#fff" : "#6b7280"}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "attendance" && styles.activeTabText,
-            ]}
-          >
-            Attendance
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Search Bar */}
-      {activeTab === "trainee" && (
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={18} color="#999" style={{ marginRight: 6 }} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search trainee..."
-            placeholderTextColor="#aaa"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <Feather name="x" size={18} color="#999" />
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-
-      {/* Content */}
-      {activeTab === "trainee" ? (
-        loading ? (
-          <FlatList
-            data={[1, 2, 3, 4, 5]}
-            keyExtractor={(item) => item.toString()}
-            renderItem={() => <SkeletonRow width1="60%" width2="40%" />}
-            contentContainerStyle={styles.listContent}
-          />
-        ) : filteredTrainees.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="people-outline" size={64} color="#cbd5e1" />
-            <Text style={styles.emptyStateTitle}>
-              {searchQuery ? "No trainee found" : "No trainee yet"}
-            </Text>
-            <Text style={styles.emptyStateText}>
-              {searchQuery
-                ? "Try adjusting your search"
-                : "Add your first trainee to get started"}
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={filteredTrainees}
-            keyExtractor={(item) => String(item.id)}
-            renderItem={renderTrainee}
-            contentContainerStyle={styles.listContent}
-            refreshControl={refreshControl}
-          />
-        )
-      ) : loading ? (
-        <FlatList
-          data={[1, 2, 3, 4, 5]}
-          keyExtractor={(item) => item.toString()}
-          renderItem={() => <SkeletonRow width1="50%" width2="30%" showBadges />}
-          contentContainerStyle={styles.listContent}
+      ListEmptyComponent={
+        <Empty
+          icon="people-outline"
+          title={search ? 'No matches' : 'No trainees yet'}
+          text={search ? 'Try a different name.' : 'When trainees choose you in their app, their requests appear above.'}
         />
-      ) : formattedAttendance.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Feather name="clipboard" size={64} color="#cbd5e1" />
-          <Text style={styles.emptyStateTitle}>No attendance records</Text>
-          <Text style={styles.emptyStateText}>
-            Start scanning QR codes to record attendance
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={formattedAttendance}
-          keyExtractor={(item) => item.id}
-          renderItem={renderAttendance}
-          contentContainerStyle={styles.listContent}
-          refreshControl={refreshControl}
-        />
-      )}
-
-      {/* Floating Button */}
-      <FAB
-        style={styles.fab}
-        icon="qrcode-scan"
-        color="#fff"
-        label="Scan"
-        onPress={() => navigation.navigate("ScanQrCode")}
-      />
-
-      {/* Modal */}
-      <Modal transparent visible={showModal} animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <View style={styles.modalIconContainer}>
-              <Ionicons name="mail-outline" size={48} color="#007bff" />
-            </View>
-            <Text style={styles.modalTitle}>New Request</Text>
-            <Text style={styles.modalMessage}>
-              You have a new trainee request. Review and approve or decline it.
-            </Text>
-
-            <View style={styles.buttonRow}>
-              <TouchableOpacity
-                style={[styles.button, styles.secondaryButton]}
-                onPress={() => setShowModal(false)}
-              >
-                <Text style={styles.secondaryButtonText}>Later</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.button, styles.primaryButton]}
-                onPress={() => {
-                  setShowModal(false);
-                  navigation.navigate("RequestTrainee");
-                }}
-              >
-                <Text style={styles.buttonText}>Review Now</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
+      }
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9fafb" },
-  header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
-  headerTitle: { fontSize: 30, fontWeight: "800", color: "#111827" },
-
-  tabContainer: {
-    flexDirection: "row",
-    backgroundColor: "#fff",
-    marginHorizontal: 16,
-    borderRadius: 12,
-    padding: 5,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
+  list: { flex: 1, backgroundColor: colors.background },
+  content: { padding: space.lg, paddingBottom: space.xxxl, flexGrow: 1 },
+  segment: { flexDirection: 'row', backgroundColor: '#ECEEF2', borderRadius: radius.md, padding: 3, marginBottom: space.lg },
+  segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: radius.sm },
+  segmentActive: { backgroundColor: colors.surface },
+  requests: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginBottom: space.lg, paddingVertical: space.md },
+  itemWrap: { backgroundColor: colors.surface, borderWidth: 1, borderTopWidth: 0, borderColor: colors.border },
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    paddingVertical: space.md,
+    paddingHorizontal: space.lg,
+    borderWidth: 1,
+    borderTopWidth: 0,
+    borderColor: colors.border,
   },
-  tab: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 10,
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 6,
-    borderRadius: 10,
-  },
-  activeTab: { backgroundColor: "#007bff" },
-  tabText: { fontSize: 14, fontWeight: "600", color: "#6b7280" },
-  activeTabText: { color: "#fff" },
-
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: 16,
-    marginTop: 10,
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-  },
-  searchInput: { flex: 1, paddingVertical: 10, fontSize: 16, color: "#111827" },
-
-  traineeCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    position: "relative",
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  avatarPlaceholder: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#e0e7ff",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  traineeName: { fontSize: 16, fontWeight: "700", color: "#111827" },
-  cardSubtext: { fontSize: 12, color: "#9ca3af", marginTop: 2 },
-
-  deleteBtn: {
-    position: "absolute",
-    right: 12,
-    top: "50%",
-    transform: [{ translateY: -12 }],
-    padding: 8,
-  },
-
-  attendanceCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-  },
-  attendanceCardContent: { flex: 1 },
-  attendanceDate: { fontSize: 16, fontWeight: "700", color: "#111827", marginBottom: 8 },
-  badgeRow: { flexDirection: "row", gap: 10 },
-  badge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "#f9fafb",
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-  },
-
-  listContent: { paddingHorizontal: 16, paddingBottom: 100, paddingTop: 10 },
-
-  emptyState: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 },
-  emptyStateTitle: { fontSize: 18, fontWeight: "700", marginTop: 12, color: "#111827" },
-  emptyStateText: { fontSize: 14, color: "#6b7280", marginTop: 4, textAlign: "center" },
-
-  fab: {
-    position: "absolute",
-    right: 20,
-    bottom: 20,
-    backgroundColor: "#007bff",
-  },
-
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalBox: {
-    backgroundColor: "#fff",
-    width: "90%",
-    borderRadius: 16,
-    padding: 24,
-    alignItems: "center",
-  },
-  modalIconContainer: { marginBottom: 12 },
-  modalTitle: { fontSize: 20, fontWeight: "800", marginBottom: 10 },
-  modalMessage: { fontSize: 15, color: "#6b7280", textAlign: "center", marginBottom: 20 },
-  buttonRow: { flexDirection: "row", gap: 12 },
-  button: { flex: 1, paddingVertical: 14, borderRadius: 10, alignItems: "center" },
-  primaryButton: { backgroundColor: "#007bff" },
-  secondaryButton: { backgroundColor: "#f3f4f6" },
-  buttonText: { color: "#fff", fontWeight: "700" },
-  secondaryButtonText: { color: "#111827", fontWeight: "700" },
-
-  skeletonLine: { height: 14, borderRadius: 6, marginBottom: 8 },
-  skeletonBadge: { height: 24, borderRadius: 8 },
-  toast: {
-    position: "absolute",
-    top: 20,
-    left: 20,
-    right: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 14,
-    borderRadius: 14,
-    zIndex: 20,
-    backgroundColor: "rgba(0,0,0,0.75)",
-    backdropFilter: "blur(10px)",
-    gap: 10,
-  },
-  success: { backgroundColor: "#10b981" },
-  error: { backgroundColor: "#ef4444" },
-  toastText: { color: "#fff", fontWeight: "600", flex: 1 },
+  first: { borderTopWidth: 1, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, overflow: 'hidden' },
+  last: { borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg, overflow: 'hidden' },
 });

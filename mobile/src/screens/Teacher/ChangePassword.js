@@ -169,7 +169,7 @@ export default function ChangePasswordScreen() {
                     : "checkmark-circle"
                 }
                 size={20}
-                color={messageType === "error" ? "#cc0000" : "#28a745"}
+                color={messageType === "error" ? "#B42318" : "#15803D"}
                 style={{ marginRight: 6 }}
               />
               <Text
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
   },
 
   saveButton: {
-    backgroundColor: "#500decff",
+    backgroundColor: "#1E4FC2",
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: "center",
@@ -256,16 +256,16 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   errorBox: {
-    backgroundColor: "#ffe6e6",
-    borderColor: "#ff4d4d",
+    backgroundColor: "#FDEEEC",
+    borderColor: "#B42318",
     borderWidth: 1,
   },
   successBox: {
-    backgroundColor: "#e6ffed",
-    borderColor: "#28a745",
+    backgroundColor: "#EAF6EE",
+    borderColor: "#15803D",
     borderWidth: 1,
   },
   messageText: { fontSize: 14, flex: 1 },
-  errorText: { color: "#cc0000", fontWeight: "500" },
-  successText: { color: "#28a745", fontWeight: "500" },
+  errorText: { color: "#B42318", fontWeight: "500" },
+  successText: { color: "#15803D", fontWeight: "500" },
 });

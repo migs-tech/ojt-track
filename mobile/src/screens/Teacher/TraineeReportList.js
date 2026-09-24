@@ -139,7 +139,7 @@ export default function TraineeReportList({ route }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#f9fafb",
+        backgroundColor: "#F6F7F9",
         padding: 16,
     },
     listContent: {
@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
     },
     showMore: {
         fontSize: 13,
-        color: "#2563eb",
+        color: "#1E4FC2",
         marginTop: 4,
     },
     date: {
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
         width: (width - 64) / 4, // 4 per row (with padding)
         height: (width - 64) / 4,
         borderRadius: 8,
-        backgroundColor: "#f3f4f6",
+        backgroundColor: "#F6F7F9",
     },
     noFiles: {
         fontSize: 13,

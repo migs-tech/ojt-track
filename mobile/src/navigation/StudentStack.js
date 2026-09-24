@@ -14,32 +14,27 @@ import EmailVerificationScreen from '@/screens/Student/EmailVerificationScreen';
 import RequestTabs from '@/screens/Student/Request';
 import Instructions from '@/screens/Student/Instructions';
 
+import { headerOptions } from '@/ui/theme';
+
 const Stack = createNativeStackNavigator();
 
 export default function StudentStack() {
   return (
      <Stack.Navigator
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: '#3a5bc0ff', // blue
-        },
-        headerTintColor: '#fff', // white text
-        presentation: 'modal',
-        animation: 'slide_from_right',
-      }}
+      screenOptions={{ ...headerOptions, animation: 'slide_from_right' }}
     >
       <Stack.Screen name="StudentTabs" component={StudentTabs} options={{ headerShown: false }} />
-      <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ title: 'Edit Profile' }} />
-      <Stack.Screen name="Attendance" component={AttendanceScreen} options={{ title: 'Attendance' }} />
-      <Stack.Screen name="ReportDetails" component={ReportDetails} options={{ title: 'Report Details' }} />
-      <Stack.Screen name="EditReport" component={EditReport} options={{ title: 'Edit Report' }} />
-      <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: 'Change Password' }} />
-      <Stack.Screen name="ManageNotifications" component={ManageNotificationsScreen} options={{ title: 'Manage Notifications' }} />
-      <Stack.Screen name="OjtCompletion" component={OjtCompletionScreen} options={{ title: 'OJT Completion' }} />
-      <Stack.Screen name="AIAssistant" component={AIAssistant} options={{ title: 'AI Assistant' }} />
-      <Stack.Screen name="EmailVerification" component={EmailVerificationScreen} options={{ title: 'Email Verification' }} />
-      <Stack.Screen name="Requests" component={RequestTabs} options={{ title: 'Requests' }} />
-      <Stack.Screen name="Instructions" component={Instructions} options={{ title: 'Instructions' }} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ title: 'Edit profile' }} />
+      <Stack.Screen name="Attendance" component={AttendanceScreen} options={{ title: 'Attendance history' }} />
+      <Stack.Screen name="ReportDetails" component={ReportDetails} options={{ title: 'Report' }} />
+      <Stack.Screen name="EditReport" component={EditReport} options={{ title: 'Edit report' }} />
+      <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: 'Change password' }} />
+      <Stack.Screen name="ManageNotifications" component={ManageNotificationsScreen} options={{ title: 'Notification settings' }} />
+      <Stack.Screen name="OjtCompletion" component={OjtCompletionScreen} options={{ title: 'OJT completion' }} />
+      <Stack.Screen name="AIAssistant" component={AIAssistant} options={{ title: 'AI assistant' }} />
+      <Stack.Screen name="EmailVerification" component={EmailVerificationScreen} options={{ title: 'Email verification' }} />
+      <Stack.Screen name="Requests" component={RequestTabs} options={{ title: 'Document requests' }} />
+      <Stack.Screen name="Instructions" component={Instructions} options={{ title: 'How it works' }} />
     </Stack.Navigator>
   );
 }

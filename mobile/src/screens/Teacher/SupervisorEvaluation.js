@@ -14,7 +14,6 @@ import {
 } from "react-native";
 import { useRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import useTraineeStore from "@/store/useTraineeStore";
 
 export default function SupervisorEvaluation() {
@@ -110,10 +109,10 @@ export default function SupervisorEvaluation() {
 
   const getPerformanceLevel = () => {
     const score = totalScore();
-    if (score >= 18) return { label: "Excellent", color: "#22c55e", icon: "star" };
-    if (score >= 15) return { label: "Very Satisfactory", color: "#3b82f6", icon: "thumbs-up" };
-    if (score >= 12) return { label: "Satisfactory", color: "#f59e0b", icon: "checkmark-circle" };
-    if (score >= 8) return { label: "Fair", color: "#ef4444", icon: "alert-circle" };
+    if (score >= 18) return { label: "Excellent", color: "#15803D", icon: "star" };
+    if (score >= 15) return { label: "Very Satisfactory", color: "#1E4FC2", icon: "thumbs-up" };
+    if (score >= 12) return { label: "Satisfactory", color: "#B45309", icon: "checkmark-circle" };
+    if (score >= 8) return { label: "Fair", color: "#B42318", icon: "alert-circle" };
     return { label: "Not Rated", color: "#9ca3af", icon: "help-circle" };
   };
 
@@ -134,7 +133,7 @@ export default function SupervisorEvaluation() {
         )}
 
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <LinearGradient colors={["#6366f1", "#8b5cf6"]} style={styles.header}>
+          <View style={[styles.header, { backgroundColor: "#1E4FC2" }]}>
             <View style={styles.headerIcon}>
               <Ionicons name="clipboard-outline" size={32} color="#fff" />
             </View>
@@ -143,7 +142,7 @@ export default function SupervisorEvaluation() {
             <View style={styles.headerBadge}>
               <Text style={styles.headerBadgeText}>{evaluationType}</Text>
             </View>
-          </LinearGradient>
+          </View>
 
           <View style={styles.section}>
             {/* Evaluation Type */}
@@ -163,7 +162,7 @@ export default function SupervisorEvaluation() {
                     <Ionicons
                       name={type === "Midterm" ? "calendar-outline" : "trophy-outline"}
                       size={18}
-                      color={evaluationType === type ? "#fff" : "#6366f1"}
+                      color={evaluationType === type ? "#fff" : "#1E4FC2"}
                     />
                     <Text
                       style={
@@ -210,7 +209,7 @@ export default function SupervisorEvaluation() {
                 <View key={c.key} style={styles.criteriaRow}>
                   <View style={styles.criteriaInfo}>
                     <View style={styles.criteriaIcon}>
-                      <Ionicons name={c.icon} size={20} color="#6366f1" />
+                      <Ionicons name={c.icon} size={20} color="#1E4FC2" />
                     </View>
                     <Text style={styles.criteriaLabel}>{c.label}</Text>
                   </View>
@@ -235,7 +234,7 @@ export default function SupervisorEvaluation() {
             {/* Comments */}
             <View style={styles.card}>
               <View style={styles.rowHeader}>
-                <Ionicons name="chatbox-ellipses-outline" size={20} color="#6366f1" />
+                <Ionicons name="chatbox-ellipses-outline" size={20} color="#1E4FC2" />
                 <Text style={styles.cardTitle}>Comments & Feedback</Text>
               </View>
               <TextInput
@@ -256,10 +255,7 @@ export default function SupervisorEvaluation() {
               disabled={submitting}
               activeOpacity={0.8}
             >
-              <LinearGradient
-                colors={submitting ? ["#a1a1aa", "#71717a"] : ["#6366f1", "#8b5cf6"]}
-                style={styles.submitGrad}
-              >
+              <View style={[styles.submitGrad, { backgroundColor: submitting ? "#C7CDD8" : "#1E4FC2" }]}>
                 {submitting ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
@@ -268,7 +264,7 @@ export default function SupervisorEvaluation() {
                     <Text style={styles.submitText}>Submit Evaluation</Text>
                   </View>
                 )}
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
           </View>
 
@@ -280,7 +276,7 @@ export default function SupervisorEvaluation() {
 }
 
 const styles = StyleSheet.create({
-  wrapper: { flex: 1, backgroundColor: "#f9fafb" },
+  wrapper: { flex: 1, backgroundColor: "#F6F7F9" },
   scroll: { flexGrow: 1 },
   header: {
     alignItems: "center",
@@ -289,7 +285,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
-    shadowColor: "#6366f1",
+    shadowColor: "#1E4FC2",
     shadowOpacity: 0.3,
     shadowOffset: { width: 0, height: 6 },
     shadowRadius: 10,
@@ -342,8 +338,8 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 6,
   },
-  toggleActive: { backgroundColor: "#6366f1" },
-  toggleText: { color: "#475569", fontWeight: "600" },
+  toggleActive: { backgroundColor: "#1E4FC2" },
+  toggleText: { color: "#374151", fontWeight: "600" },
   toggleTextActive: { color: "#fff", fontWeight: "700" },
   summaryCard: {
     backgroundColor: "#fff",
@@ -374,8 +370,8 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 18, fontWeight: "700", color: "#1f2937" },
   scale: {
     marginLeft: "auto",
-    backgroundColor: "#eef2ff",
-    color: "#6366f1",
+    backgroundColor: "#EEF3FC",
+    color: "#1E4FC2",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
@@ -388,7 +384,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: "#eef2ff",
+    backgroundColor: "#EEF3FC",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -402,8 +398,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#e5e7eb",
   },
-  scoreBtnActive: { backgroundColor: "#6366f1", borderColor: "#6366f1" },
-  scoreText: { color: "#475569", fontWeight: "700" },
+  scoreBtnActive: { backgroundColor: "#1E4FC2", borderColor: "#1E4FC2" },
+  scoreText: { color: "#374151", fontWeight: "700" },
   scoreTextActive: { color: "#fff", fontWeight: "800" },
   textarea: {
     minHeight: 120,
@@ -412,7 +408,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     fontSize: 15,
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#F6F7F9",
     color: "#111827",
     textAlignVertical: "top",
   },
@@ -434,7 +430,7 @@ const styles = StyleSheet.create({
     backdropFilter: "blur(10px)",
     gap: 10,
   },
-  success: { backgroundColor: "#10b981" },
-  error: { backgroundColor: "#ef4444" },
+  success: { backgroundColor: "#15803D" },
+  error: { backgroundColor: "#B42318" },
   toastText: { color: "#fff", fontWeight: "600", flex: 1 },
 });

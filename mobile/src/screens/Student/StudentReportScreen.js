@@ -1,527 +1,247 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  FlatList,
-  Alert,
-  Platform,
-  Image,
-  Pressable,
-  ScrollView,
-  Animated,
-  RefreshControl,
-  KeyboardAvoidingView,
-} from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
-import { format } from "date-fns";
-import { errorMessage } from "@/lib/api";
-import { notify } from "@/lib/notify";
-import DateTimePicker from "@react-native-community/datetimepicker";
-import * as ImagePicker from "expo-image-picker";
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
-import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
-import { useReportStore } from "@/store/useReportStore";
-import Modal from "react-native-modal"; // 👈 use this instead of RN Modal
+// Trainee reports: write today's report, and see past ones.
+import React, { useCallback, useState } from 'react';
+import { FlatList, Image, Platform, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { useFocusEffect } from '@react-navigation/native';
+import { format, isToday } from 'date-fns';
+import { useReportStore } from '@/store/useReportStore';
+import { errorMessage } from '@/lib/api';
+import { notify } from '@/lib/notify';
+import { Button, Card, Empty, Field, Loading, Notice, Screen, T, colors, radius, space } from '@/ui';
+
 const Tab = createMaterialTopTabNavigator();
 
-function SubmitReport() {
+// Report dates come as "YYYY-MM-DD" (or with a time); show them in the phone's local calendar
+const reportDate = (d) => (d ? new Date(String(d).slice(0, 10) + 'T00:00:00') : null);
+
+function SubmitReport({ navigation }) {
   const { saveReport, loading, getReports } = useReportStore();
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [date, setDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [files, setFiles] = useState([]);
-  const [message, setMessage] = useState(null);
-  const [alertVisible, setAlertVisible] = useState(false);
-  const [alertMessage, setAlertMessage] = useState("");
+  const [showDate, setShowDate] = useState(false);
+  const [photo, setPhoto] = useState(null);
+  const [errors, setErrors] = useState({});
+  const [formError, setFormError] = useState('');
 
-    
-  const showMessage = (text, type) => {
-      setMessage({ text, type });
-      setTimeout(() => setMessage(null),3000);
-  };
-
-  const showAlert = (msg) => {
-    setAlertMessage(msg);
-    setAlertVisible(true);
-  };
-
-  const pickFile = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-       showAlert("Permission to access media library is required!");
+  const pickPhoto = async (camera) => {
+    const perm = camera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (perm.status !== 'granted') {
+      setFormError(camera ? 'Allow camera access to take a photo.' : 'Allow photo access to choose a picture.');
       return;
     }
-
-    // One photo per report, compressed so it stays under the server's 5 MB limit
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.5,
-      allowsMultipleSelection: false,
-    });
+    // Compressed so it stays under the server's 5 MB limit
+    const options = { mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.5 };
+    const result = camera ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
     if (!result.canceled && result.assets?.length) {
-      setFiles([result.assets[0]]);
+      setPhoto(result.assets[0]);
+      setErrors((e) => ({ ...e, photo: '' }));
     }
   };
 
-  const removeFile = (index) => {
-    const updated = [...files];
-    updated.splice(index, 1);
-    setFiles(updated);
-  };
+  const submit = async () => {
+    const e = {};
+    if (!title.trim()) e.title = 'Add a short title.';
+    if (!description.trim()) e.description = 'Describe what you worked on.';
+    if (!photo) e.photo = 'Add a photo of your work.';
+    setErrors(e);
+    setFormError('');
+    if (Object.keys(e).length) return;
 
-
-  const formatFileSize = (bytes) => {
-    if (!bytes) return "0 KB";
-    const sizes = ["Bytes", "KB", "MB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return (bytes / Math.pow(1024, i)).toFixed(1) + " " + sizes[i];
-  };
-
-  const submitReport = async () => {
-    if (!title.trim() || !description.trim()) {
-      showMessage("Please enter a title and a description.", "error");
-      return;
-    }
-    if (files.length === 0) {
-      showMessage("Please add a photo of your work.", "error");
-      return;
-    }
-    const formData = new FormData();
-    formData.append("title", title);
-    formData.append("description", description);
+    const form = new FormData();
+    form.append('title', title.trim());
+    form.append('description', description.trim());
     // The calendar day on the phone (toISOString() is UTC and can shift the day)
-    formData.append("date", format(date, "yyyy-MM-dd"));
+    form.append('date', format(date, 'yyyy-MM-dd'));
+    form.append('files[]', { uri: photo.uri, name: photo.fileName || 'photo.jpg', type: photo.mimeType || 'image/jpeg' });
 
-    if (files.length > 0) {
-      files.forEach((file, i) => {
-        formData.append("files[]", {
-          uri: file.uri,
-          name: file.fileName || `image_${i}.jpg`,
-          type: file.mimeType || "image/jpeg",
-        });
-      });
-    }
     try {
-      const res = await saveReport(formData);
+      const res = await saveReport(form);
       if (res.success) {
-        notify.success("Report submitted", "Your supervisor can now see it.");
-        setTitle("");
-        setDescription("");
+        notify.success('Report submitted', 'Your supervisor can see it now.');
+        setTitle('');
+        setDescription('');
         setDate(new Date());
-        setFiles([]);
-        await getReports(); // Refresh the report list
+        setPhoto(null);
+        await getReports();
+        navigation.navigate('History');
       } else {
-        showMessage(res.message || "Failed to submit report", "error");
+        setFormError(res.message || "Couldn't submit the report.");
       }
-      
-    } catch (error) {
-      showMessage(errorMessage(error, "Failed to submit report"), "error");
+    } catch (err) {
+      setFormError(errorMessage(err, "Couldn't submit the report."));
     }
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
-      {message && (
-        <View
-          style={[
-            styles.messageBanner,
-            styles[message.type], // maps directly to success, error, info, warning
-          ]}
-        >
-          <Ionicons
-            name={
-              message.type === "success"
-                ? "checkmark-circle"
-                : message.type === "error"
-                ? "close-circle"
-                : message.type === "info"
-                ? "information-circle"
-                : "warning"
-            }
-            size={22}
-            color={
-              message.type === "success"
-                ? "#2E7D32"
-                : message.type === "error"
-                ? "#C62828"
-                : message.type === "info"
-                ? "#0288D1"
-                : "#ED6C02"
-            }
-          />
-          <Text
-            style={[
-              styles.messageText,
-              {
-                color:
-                  message.type === "success"
-                    ? "#2E7D32"
-                    : message.type === "error"
-                    ? "#C62828"
-                    : message.type === "info"
-                    ? "#0288D1"
-                    : "#ED6C02",
-              },
-            ]}
-          >
-            {message.text}
-          </Text>
-        </View>
-      )}
+    <Screen keyboard>
+      {formError ? <Notice tone="danger" style={{ marginBottom: space.lg }}>{formError}</Notice> : null}
 
-      <Text style={styles.label}>Title</Text>
-      <TextInput
-        style={styles.input}
-        value={title}
-        onChangeText={setTitle}
-        placeholder="Enter title"
-        placeholderTextColor={"#999"}
-        color={"#333"}
-      />
-
-      <Text style={styles.label}>Date</Text>
-      <TouchableOpacity
-        style={styles.input}
-        onPress={() => setShowDatePicker(true)}
-      >
-        <Text>{date.toDateString()}</Text>
-      </TouchableOpacity>
-      {showDatePicker && (
+      <T v="label" style={{ marginBottom: 6 }}>Date</T>
+      <Pressable onPress={() => setShowDate(true)} style={styles.dateField} accessibilityRole="button">
+        <T v="body" style={{ flex: 1, color: colors.ink }}>
+          {isToday(date) ? `Today, ${format(date, 'MMMM d')}` : format(date, 'EEEE, MMMM d')}
+        </T>
+        <Ionicons name="calendar-outline" size={20} color={colors.muted} />
+      </Pressable>
+      {showDate ? (
         <DateTimePicker
           value={date}
           mode="date"
-          display={Platform.OS === "ios" ? "spinner" : "default"}
           maximumDate={new Date()}
-          onChange={(event, selectedDate) => {
-            setShowDatePicker(Platform.OS === "ios");
-            if (selectedDate) setDate(selectedDate);
+          display={Platform.OS === 'ios' ? 'inline' : 'default'}
+          onChange={(event, selected) => {
+            setShowDate(Platform.OS === 'ios');
+            if (selected) setDate(selected);
           }}
         />
-      )}
+      ) : null}
 
-      <Text style={styles.label}>Description</Text>
-      <TextInput
-        style={[styles.input, { height: 150 }]}
+      <Field
+        label="Title"
+        value={title}
+        onChangeText={(t) => {
+          setTitle(t);
+          setErrors((e) => ({ ...e, title: '' }));
+        }}
+        placeholder="e.g. Set up the office network"
+        error={errors.title}
+        maxLength={120}
+      />
+      <Field
+        label="What did you do?"
         value={description}
-        onChangeText={setDescription}
-        placeholder="Enter description"
+        onChangeText={(t) => {
+          setDescription(t);
+          setErrors((e) => ({ ...e, description: '' }));
+        }}
+        placeholder="Tasks you worked on, what you learned, any problems."
         multiline
-        placeholderTextColor={"#999"}
-        color={"#333"}
+        error={errors.description}
       />
 
-      <TouchableOpacity style={styles.selectBtn} onPress={pickFile}>
-        <Ionicons name="images" size={20} color="#fff" />
-        <Text style={styles.btnText}>
-          {files.length > 0 ? "Change photo" : "Add a photo (required)"}
-        </Text>
-      </TouchableOpacity>
-
-      {files.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {files.map((file, index) => (
-            <View key={index} style={styles.previewBox}>
-              <Image source={{ uri: file.uri }} style={styles.previewImage} />
-              <TouchableOpacity
-                onPress={() => removeFile(index)}
-                style={styles.removeBtnOverlay}
-              >
-                <MaterialIcons name="close" size={18} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          ))}
-        </ScrollView>
-      )}
-
-      <TouchableOpacity
-        style={[styles.submitButton, loading && { opacity: 0.7 }]}
-        onPress={submitReport}
-        disabled={loading}
-      >
-        <Text style={styles.submitText}>
-          {loading ? "Submitting..." : "Submit Report"}
-        </Text>
-      </TouchableOpacity>
-      <Modal
-        isVisible={alertVisible}
-        onBackdropPress={() => setAlertVisible(false)}
-        onBackButtonPress={() => setAlertVisible(false)}
-        backdropOpacity={0.3}
-        animationIn="zoomIn"
-        animationOut="zoomOut"
-      >
-        <View
-          style={{
-            backgroundColor: "#fff",
-            padding: 20,
-            borderRadius: 10,
-            alignItems: "center",
-          }}
-        >
-          <Text style={{ fontSize: 16, marginBottom: 15 }}>{alertMessage}</Text>
-          <Pressable
-            onPress={() => setAlertVisible(false)}
-            style={{
-              backgroundColor: "#4a90e2",
-              paddingVertical: 10,
-              paddingHorizontal: 20,
-              borderRadius: 5,
-            }}
-          >
-            <Text style={{ color: "#fff", fontWeight: "600" }}>OK</Text>
-          </Pressable>
+      <T v="label" style={{ marginBottom: 6 }}>Photo</T>
+      {photo ? (
+        <View style={styles.photoWrap}>
+          <Image source={{ uri: photo.uri }} style={styles.photo} />
+          <View style={styles.photoActions}>
+            <Button title="Change" variant="secondary" small onPress={() => pickPhoto(false)} style={{ flex: 1 }} />
+            <Button title="Remove" variant="ghost" small onPress={() => setPhoto(null)} style={{ flex: 1 }} />
+          </View>
         </View>
-      </Modal>
-    </ScrollView>
-    </KeyboardAvoidingView>
+      ) : (
+        <View style={[styles.photoEmpty, errors.photo && { borderColor: colors.danger }]}>
+          <T v="caption" style={{ textAlign: 'center', marginBottom: space.md }}>A photo of your work is required.</T>
+          <View style={{ flexDirection: 'row', gap: space.md }}>
+            <Button title="Take photo" icon="camera-outline" variant="secondary" small onPress={() => pickPhoto(true)} style={{ flex: 1 }} />
+            <Button title="Choose" icon="image-outline" variant="secondary" small onPress={() => pickPhoto(false)} style={{ flex: 1 }} />
+          </View>
+        </View>
+      )}
+      {errors.photo ? <T v="caption" style={{ color: colors.danger, marginTop: 6 }}>{errors.photo}</T> : null}
+
+      <Button title="Submit report" onPress={submit} loading={loading} style={{ marginTop: space.xxl }} />
+    </Screen>
   );
 }
+
 function History({ navigation }) {
-  const { reports, getReports} = useReportStore();
-  const [loading, setLoading] = useState(reports.length === 0);
+  const { reports, getReports } = useReportStore();
+  const [loaded, setLoaded] = useState(reports.length > 0);
   const [refreshing, setRefreshing] = useState(false);
+
   useFocusEffect(
     useCallback(() => {
-      getReports().finally(() => setLoading(false));
+      getReports().finally(() => setLoaded(true));
     }, [getReports])
   );
+
   const onRefresh = async () => {
     setRefreshing(true);
     await getReports();
     setRefreshing(false);
   };
 
-  const validReports = reports.filter(Boolean);
+  if (!loaded) return <Loading />;
+  const list = reports.filter(Boolean);
 
   return (
-    <View style={{ flex: 1 }}>
-      {loading ? (
-        <FlatList
-          data={[1, 2, 3, 4, 5, 6, 7]} // dummy data for skeletons
-          keyExtractor={(item) => item.toString()}
-          renderItem={() => <SkeletonCard />}
+    <FlatList
+      style={{ backgroundColor: colors.background }}
+      contentContainerStyle={{ padding: space.lg, flexGrow: 1 }}
+      data={list}
+      keyExtractor={(item) => String(item.id)}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
+      ItemSeparatorComponent={() => <View style={{ height: space.sm }} />}
+      renderItem={({ item }) => {
+        const d = reportDate(item.date);
+        return (
+          <Card onPress={() => navigation.navigate('ReportDetails', { reportId: item.id })}>
+            <T v="caption">{d ? format(d, 'EEEE, MMMM d, yyyy') : ''}</T>
+            <T v="heading" style={{ marginTop: 2 }} numberOfLines={1}>{item.title}</T>
+            <T v="caption" numberOfLines={2} style={{ marginTop: 2, color: colors.text }}>{item.description}</T>
+          </Card>
+        );
+      }}
+      ListEmptyComponent={
+        <Empty
+          icon="document-text-outline"
+          title="No reports yet"
+          text="Reports you submit appear here."
+          action="Write a report"
+          onAction={() => navigation.navigate('Submit Report')}
         />
-      ) : (
-        <FlatList
-          contentContainerStyle={{ flexGrow: 1 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#2076cc"]} />}
-          data={validReports}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.historySimpleCard}
-              onPress={() =>
-                navigation.navigate("ReportDetails", { reportId: item.id })
-              }
-            >
-              <Text style={styles.historySimpleTitle}>{item.title}</Text>
-              <Text style={styles.historySimpleDate}>
-                {new Date(item.date).toDateString()}
-              </Text>
-              <Text style={styles.historySimplePreview} numberOfLines={1}>
-                {item.description}
-              </Text>
-            </TouchableOpacity>
-          )}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No reports yet</Text>
-              <Text style={{ color: "#94a3b8", marginTop: 6, textAlign: "center" }}>
-                Reports you submit appear here. Pull down to refresh.
-              </Text>
-            </View>
-          }
-        />
-      )}
-    </View>
-  );
-}
-
-function SkeletonCard() {
-  const shimmer = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(shimmer, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: false,
-        }),
-        Animated.timing(shimmer, {
-          toValue: 0,
-          duration: 800,
-          useNativeDriver: false,
-        }),
-      ])
-    ).start();
-  }, [shimmer]);
-
-  const bgColor = shimmer.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["#e0e0e0", "#f5f5f5"], // shimmer effect
-  });
-
-  return (
-    <View style={styles.historySimpleCard}>
-      <Animated.View
-        style={[styles.skeletonLine, { width: "60%", backgroundColor: bgColor }]}
-      />
-      <Animated.View
-        style={[styles.skeletonLine, { width: "40%", marginTop: 6, backgroundColor: bgColor }]}
-      />
-      <Animated.View
-        style={[styles.skeletonLine, { width: "80%", marginTop: 6, backgroundColor: bgColor }]}
-      />
-    </View>
+      }
+    />
   );
 }
 
 export default function StudentReportScreen({ route }) {
-  const initialTab =
-    route?.params?.screen === "History" ? "History" : "Submit Report";
+  const initialTab = route?.params?.screen === 'History' ? 'History' : 'Submit Report';
   return (
     <Tab.Navigator
       initialRouteName={initialTab}
       screenOptions={{
-        tabBarLabelStyle: { fontSize: 14, fontWeight: "600" },
-        tabBarIndicatorStyle: { backgroundColor: "#4a90e2" },
+        tabBarLabelStyle: { fontSize: 14, fontWeight: '600', textTransform: 'none' },
+        tabBarActiveTintColor: colors.ink,
+        tabBarInactiveTintColor: colors.muted,
+        tabBarIndicatorStyle: { backgroundColor: colors.primary, height: 2 },
+        tabBarStyle: { backgroundColor: colors.surface, elevation: 0, shadowOpacity: 0, borderBottomWidth: 1, borderBottomColor: colors.border },
         swipeEnabled: false,
       }}
     >
-      <Tab.Screen name="Submit Report" component={SubmitReport} />
-      <Tab.Screen name="History" component={History} />
+      <Tab.Screen name="Submit Report" component={SubmitReport} options={{ title: 'Write' }} />
+      <Tab.Screen name="History" component={History} options={{ title: 'History' }} />
     </Tab.Navigator>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#f5f7fa" },
-  label: { fontSize: 16, fontWeight: "600", marginBottom: 5, color: "#333" },
-  input: {
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 15,
+  dateField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 48,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: space.md,
+    marginBottom: space.lg,
   },
-  selectBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#2196F3",
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginBottom: 15,
+  photoEmpty: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: space.lg,
+    backgroundColor: colors.surface,
   },
-  btnText: { color: "#fff", marginLeft: 8, fontWeight: "bold" },
-  statusRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  statusText: { marginLeft: 6, color: "#4CAF50", fontWeight: "bold" },
-  fileRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f1f1f1",
-    padding: 10,
-    borderRadius: 8,
-    justifyContent: "space-between",
-    marginBottom: 15,
-  },
-  fileText: { flex: 1, marginLeft: 10, fontSize: 14 },
-  removeBtn: {
-    backgroundColor: "#F44336",
-    padding: 5,
-    borderRadius: 50,
-    marginLeft: 10,
-  },
-  submitButton: {
-    backgroundColor: "#4a90e2",
-    padding: 14,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  submitText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-
-  // --- Simplified History styles ---
-  historySimpleCard: {
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  historySimpleTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#222",
-    marginBottom: 2,
-  },
-  historySimpleDate: {
-    fontSize: 13,
-    color: "#777",
-    marginBottom: 4,
-  },
-  historySimplePreview: {
-    fontSize: 13,
-    color: "#555",
-  },
-
-  skeletonLine: {
-    height: 14,
-    borderRadius: 4,
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 20,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: "#777",
-  },
-  previewBox: {
-    position: "relative",
-    marginRight: 10,
-  },
-  previewImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 10,
-  },
-  removeBtnOverlay: {
-    position: "absolute",
-    top: -5,
-    right: -5,
-    backgroundColor: "#F44336",
-    borderRadius: 12,
-    padding: 2,
-  },
-  messageBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 10,
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 20,
-  },
-  success: { backgroundColor: "#DFF6E0" }, // light green
-  error: { backgroundColor: "#FDE2E1" }, // light red
-  info: { backgroundColor: "#E0F2FE" }, // light blue
-  warning: { backgroundColor: "#FFF4E5" }, // light yellow
-  messageText: { marginLeft: 8, fontSize: 15, fontWeight: "600" },
- 
+  photoWrap: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.surface },
+  photo: { width: '100%', height: 200, backgroundColor: colors.divider },
+  photoActions: { flexDirection: 'row', gap: space.sm, padding: space.sm },
 });

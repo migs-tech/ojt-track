@@ -1,67 +1,48 @@
+// Toast shown at the top of the screen (see lib/notify.js).
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import * as Animatable from "react-native-animatable";
-import { FontAwesome } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
+import { colors, radius, space } from "@/ui/theme";
 
-// 🔹 Custom rolling + pop keyframes
-const rollInPop = {
-  0: { opacity: 0, transform: [{ rotate: "0deg" }, { scale: 0 }] },
-  0.5: { opacity: 1, transform: [{ rotate: "360deg" }, { scale: 1.3 }] },
-  1: { opacity: 1, transform: [{ rotate: "360deg" }, { scale: 1 }] },
+const tones = {
+  success: { icon: "checkmark-circle", color: colors.success },
+  error: { icon: "alert-circle", color: colors.danger },
+  info: { icon: "information-circle", color: colors.primary },
 };
 
 export default function CustomToast({ text1, text2, type }) {
-  const icon =
-    type === "error"
-      ? { name: "times-circle", color: "#FF4C4C" }
-      : type === "info"
-      ? { name: "info-circle", color: "#3498db" }
-      : { name: "check-circle", color: "#4BB543" }; // default success
-
+  const tone = tones[type] || tones.success;
   return (
-    <Animatable.View
-      key={Date.now()}
-      animation="slideInLeft"
-      duration={600}
-      style={styles.toastContainer}
-    >
-      <Animatable.View animation={rollInPop} duration={1000} iterationCount={1}>
-        <FontAwesome name={icon.name} size={28} color={icon.color} />
-      </Animatable.View>
-
-      <View style={styles.textContainer}>
+    <View style={styles.toast} accessibilityRole="alert">
+      <Ionicons name={tone.icon} size={22} color={tone.color} />
+      <View style={styles.text}>
         <Text style={styles.title}>{text1}</Text>
         {text2 ? <Text style={styles.message}>{text2}</Text> : null}
       </View>
-    </Animatable.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  toastContainer: {
+  toast: {
     flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    padding: 12,
-    marginHorizontal: 20,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    elevation: 5,
+    alignItems: "flex-start",
+    gap: space.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: space.md,
+    paddingHorizontal: space.lg,
+    marginHorizontal: space.lg,
     alignSelf: "stretch",
+    shadowColor: "#111827",
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
-  textContainer: {
-    marginLeft: 10,
-    flexShrink: 1,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  message: {
-    fontSize: 14,
-    color: "#555",
-  },
+  text: { flex: 1 },
+  title: { fontSize: 15, fontWeight: "600", color: colors.ink },
+  message: { fontSize: 13, lineHeight: 18, color: colors.muted, marginTop: 2 },
 });

@@ -79,7 +79,7 @@ export default function App() {
   const [messages, setMessages] = useState([
     { 
       id: "1", 
-      text: "Hello! I’m your AI assistant 🤖. Each reply is a single conversation and I won’t remember previous messages.", 
+      text: "Hello! I’m your AI assistant. Each reply is a single conversation and I won’t remember previous messages.", 
       sender: "ai" ,
     },
   ]);
@@ -156,7 +156,7 @@ useEffect(() => {
       console.error("AI Assistant Error:", error);
       setMessages((prev) => [
         ...prev,
-        { id: Date.now().toString(), text: "⚠️ Oops, something went wrong.", sender: "ai" },
+        { id: Date.now().toString(), text: "Something went wrong. Please try again.", sender: "ai" },
       ]);
     } finally {
       setTyping(false);
@@ -165,7 +165,7 @@ useEffect(() => {
 
   const handleCopy = async (text) => {
     await Clipboard.setStringAsync(text);
-    Alert.alert("Copied", "AI response copied to clipboard ✅");
+    Alert.alert("Copied", "Response copied to the clipboard.");
   };
 
   const renderMessage = ({ item }) => {
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     maxWidth: "75%",
   },
-  userBubble: { backgroundColor: "#0078FF", borderTopRightRadius: 4 },
+  userBubble: { backgroundColor: "#1E4FC2", borderTopRightRadius: 4 },
   aiBubble: { backgroundColor: "#E5E5EA", borderTopLeftRadius: 4 },
 
   message: { fontSize: 14, lineHeight: 18 },
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   sendButton: {
-    backgroundColor: "#0078FF",
+    backgroundColor: "#1E4FC2",
     borderRadius: 25,
     paddingHorizontal: 16,
     justifyContent: "center",

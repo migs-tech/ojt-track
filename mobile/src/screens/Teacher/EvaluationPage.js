@@ -285,7 +285,7 @@ export default function EvaluationPage() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f8f9fa" },
+  container: { flex: 1, backgroundColor: "#F6F7F9" },
 
   headerContainer: {
     backgroundColor: "#fff",
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     marginHorizontal: 4,
   },
-  progressStepActive: { backgroundColor: "#4F46E5" },
+  progressStepActive: { backgroundColor: "#1E4FC2" },
   pageIndicator: { textAlign: "center", fontSize: 14, color: "#6b7280" },
 
   scrollView: { paddingHorizontal: 20 },
@@ -325,13 +325,13 @@ const styles = StyleSheet.create({
   itemNumber: {
     width: 30,
     height: 30,
-    backgroundColor: "#EEF2FF",
+    backgroundColor: "#EEF3FC",
     borderRadius: 15,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
   },
-  itemNumberText: { color: "#4F46E5", fontWeight: "700" },
+  itemNumberText: { color: "#1E4FC2", fontWeight: "700" },
   itemText: { flex: 1, fontSize: 16, fontWeight: "500", color: "#374151" },
 
   pointsContainer: { flexDirection: "row", alignItems: "center" },
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     width: 70,
     textAlign: "center",
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#F6F7F9",
   },
   maxScore: { marginLeft: 8, color: "#9ca3af", fontSize: 15 },
 
@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
     borderColor: "#e5e7eb",
     borderRadius: 12,
     padding: 12,
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#F6F7F9",
     textAlignVertical: "top",
   },
 
@@ -389,14 +389,14 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 14,
     borderRadius: 12,
-    backgroundColor: "#4F46E5",
+    backgroundColor: "#1E4FC2",
     alignItems: "center",
   },
   saveBtn: {
     flex: 1,
     padding: 14,
     borderRadius: 12,
-    backgroundColor: "#10B981",
+    backgroundColor: "#15803D",
     alignItems: "center",
   },
 
@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
     backdropFilter: "blur(10px)",
     gap: 10,
   },
-  success: { backgroundColor: "#10b981" },
-  error: { backgroundColor: "#ef4444" },
+  success: { backgroundColor: "#15803D" },
+  error: { backgroundColor: "#B42318" },
   toastText: { color: "#fff", fontWeight: "600", flex: 1 },
 });

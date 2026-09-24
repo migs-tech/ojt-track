@@ -129,7 +129,7 @@ export default function EditReport({ route, navigation }) {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: "#f9fafc" }}
+      style={{ flex: 1, backgroundColor: "#F6F7F9" }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
   selectBtn: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#4a90e2",
+    backgroundColor: "#1E4FC2",
     paddingHorizontal: 15,
     paddingVertical: 12,
     borderRadius: 12,
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: -5,
     right: -5,
-    backgroundColor: "#F44336",
+    backgroundColor: "#B42318",
     borderRadius: 12,
     padding: 2,
   },
@@ -338,16 +338,16 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   successBox: {
-    backgroundColor: "#4CAF50",
+    backgroundColor: "#15803D",
   },
   errorBox: {
-    backgroundColor: "#F44336",
+    backgroundColor: "#B42318",
   },
   infoBox: {
     backgroundColor: "#2196F3",
   },
   footer: {
-    backgroundColor: "#f9fafc",
+    backgroundColor: "#F6F7F9",
     padding: 15,
     borderTopWidth: 1,
     borderColor: "#eee",
