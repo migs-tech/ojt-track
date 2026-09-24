@@ -108,6 +108,7 @@ class Access {
         ],
         // 'report' (GenerateReportController) is used internally by admin actions and scheduled jobs only.
         'cron' => [
+            'runAll'                          => 'cron',
             'runAutoTimeOut'                  => 'cron',
             'runDailyAttendanceChecker'       => 'cron',
             'runCheckInDailyReminder'         => 'cron',

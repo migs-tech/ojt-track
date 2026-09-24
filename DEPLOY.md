@@ -74,24 +74,28 @@ Collect the values marked **📋** as you go. You'll paste them into Render in s
 
 ## 7. Keep-awake and scheduled jobs: cron-job.org
 
-Render's free plan sleeps after 15 minutes without traffic. One ping every 10 minutes keeps the API awake. The other jobs send the app's reminders and reports.
+Render's free plan sleeps after 15 minutes without traffic. One job every 10 minutes keeps the API awake and runs the app's reminders and reports when they're due.
 
-For every job except the first, open **Advanced → Headers** and add the header `X-Cron-Secret` with your 📋 CRON_SECRET value. Set the time zone to **Asia/Manila**.
+Create one cronjob:
+- **URL:** `https://<your-api>.onrender.com/api/cron/runAll`
+- **Schedule:** every 10 minutes, time zone **Asia/Manila**
+- **Advanced → Headers:** add `X-Cron-Secret` with your 📋 CRON_SECRET value
 
-| Job | URL (`https://<your-api>.onrender.com/api/...`) | Schedule |
-|---|---|---|
-| Keep awake (no header needed) | `health` | Every 10 minutes |
-| Morning quote | `cron/runDailyQuote` | Daily 07:00 |
-| Time-in reminder | `cron/runCheckInDailyReminder` | Mon–Fri 07:30 |
-| Time-out reminder | `cron/runCheckOutDailyReminder` | Mon–Fri 18:00 |
-| Daily report reminder | `cron/runDailyReportReminder` | Mon–Fri 20:00 |
-| Weekly report reminder | `cron/runWeeklyReportReminder` | Fri 20:00 |
-| Monthly hours report (runs only on the last day of the month) | `cron/runAutoGenerateMonthlyHoursReport` | Daily 22:00 |
-| Auto time-out for anyone still clocked in | `cron/runAutoTimeOut` | Daily 23:00 |
-| Weekly reports + hours email | `cron/runWeeklyReportsAndHours` | Fri 23:40 |
-| Mark absences | `cron/runDailyAttendanceChecker` | Mon–Fri 23:50 |
+`cron/runAll` runs each task once a day inside its time window (Asia/Manila):
 
-These times are suggestions based on what each job checks. Some jobs only act at certain hours; for example, the weekly report runs only on Fridays between 23:30 and 23:50.
+| Task | When |
+|---|---|
+| Morning quote | Daily 07:00 |
+| Time-in reminder | Mon–Fri 07:50 |
+| Time-out reminder | Mon–Fri 17:50 |
+| Daily report reminder | Mon–Fri 20:00 |
+| Weekly report reminder | Fri 20:00 |
+| Monthly hours report (only on the last day of the month) | Daily 22:00 |
+| Auto time-out for anyone still clocked in | Daily 23:00 |
+| Weekly reports + hours email | Fri 23:40 |
+| Mark absences | Mon–Fri 23:50 |
+
+Each task can also be called on its own, e.g. `cron/runAutoTimeOut`, with the same header.
 
 ## 8. First admin account
 

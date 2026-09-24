@@ -11,6 +11,47 @@ class CronJobController {
         $this->generate = new GenerateReportController();
     }
 
+    /**
+     * Runs every job that is due right now. Call it every 10 minutes (it also keeps a sleeping
+     * server awake), so one cron-job.org job replaces a separate job per task.
+     * Each window starts on a 10-minute mark and each job runs at most once per day.
+     */
+    public function runAll() {
+        ignore_user_abort(true); // keep going if the caller stops waiting
+        set_time_limit(0);
+
+        $weekdays = [1, 2, 3, 4, 5];
+        // [method, days (date('N')) or null for every day, window start, window end]
+        $schedule = [
+            ['runDailyQuote',                     null,      '07:00', '07:09'],
+            ['runCheckInDailyReminder',           $weekdays, '07:50', '07:55'],
+            ['runCheckOutDailyReminder',          $weekdays, '17:50', '17:55'],
+            ['runDailyReportReminder',            $weekdays, '20:00', '20:09'],
+            ['runWeeklyReportReminder',           [5],       '20:00', '20:09'],
+            ['runAutoGenerateMonthlyHoursReport', null,      '22:00', '22:09'], // acts only on the last day of the month
+            ['runAutoTimeOut',                    null,      '23:00', '23:09'],
+            ['runWeeklyReportsAndHours',          [5],       '23:40', '23:49'],
+            ['runDailyAttendanceChecker',         $weekdays, '23:50', '23:59'],
+        ];
+
+        $now = date('H:i');
+        $day = (int) date('N');
+        $ran = [];
+        foreach ($schedule as [$method, $days, $start, $end]) {
+            if ($days !== null && !in_array($day, $days, true)) continue;
+            if ($now < $start || $now > $end) continue;
+            if (RateLimiter::attempt("cron-run:$method:" . date('Y-m-d'), 1, 86400)) continue;
+            try {
+                $ran[$method] = $this->$method();
+            } catch (Throwable $e) {
+                error_log("[cron] $method failed: " . $e->getMessage());
+                $ran[$method] = ['success' => false, 'message' => 'Failed'];
+            }
+        }
+
+        return ['success' => true, 'time' => date('Y-m-d H:i'), 'ran' => $ran];
+    }
+
     public function runAutoTimeOut() {
         
         $today = date("Y-m-d");
