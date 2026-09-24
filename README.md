@@ -2,13 +2,15 @@
 
 A full-stack **On-the-Job Training (OJT) tracking system** for trainees and supervisors. Trainees log attendance by scanning a QR code, submit reports, and track their required hours. Supervisors manage trainees, review reports, and fill out evaluations. The system includes a web dashboard, a mobile app, and a REST API.
 
-<!-- Replace with your own screenshots, e.g. docs/screenshots/dashboard.png -->
-<p align="center">
-  <img src="docs/screenshots/web-dashboard.png" width="70%" alt="Web dashboard" />
-  <img src="docs/screenshots/mobile-home.png" width="22%" alt="Mobile app" />
-</p>
+### ▶ [Live demo](https://migs-tech.github.io/ojt-track/)
 
-<!-- **Live demo:** https://your-demo-link -->
+Click **Try the live demo** and sign in with the demo account, which is already filled in. The demo runs the real Vue dashboard against sample data in your browser, so there's no backend and no real student data. Changes reset when you reload.
+
+![Admin dashboard](docs/screenshots/dashboard.png)
+
+| Trainee details | Assign supervisor |
+|---|---|
+| ![Trainee details](docs/screenshots/trainee-details.png) | ![Assign supervisor](docs/screenshots/assign-supervisor.png) |
 
 ## Features
 
@@ -60,6 +62,8 @@ cd web
 npm install
 npm run dev
 ```
+
+To run the demo version with sample data instead of the API, use `npm run build:demo`. It's deployed to GitHub Pages automatically on every push to `main`. The sample data and the mock API live in `web/src/demo/`.
 
 ### 4. Mobile
 ```bash

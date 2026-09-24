@@ -7,7 +7,7 @@
         <!-- Logo -->
         <div class="flex items-center space-x-2">
           <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
-            <img src="/icon.png" alt="Logo" class="h-12 w-12 rounded-full" />
+            <img :src="logo" alt="Logo" class="h-12 w-12 rounded-full" />
           </div>
           <span class="text-2xl font-bold text-gray-900">OJT Tracker</span>
         </div>
@@ -21,6 +21,7 @@
             Register
           </button>
           <a
+            v-if="!isDemo"
             href="https://ojt.kamsite.com/api/uploads/app/ojt-tracking.apk"
             download="ojt-tracking.apk"
             class="px-5 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition duration-200 shadow-md hover:shadow-lg flex items-center space-x-2"
@@ -48,7 +49,8 @@
           Register
         </button>
         <a
-          href="https://ojt.kamsite.com/api/uploads/app/ojt-tracking.apk"
+          v-if="!isDemo"
+            href="https://ojt.kamsite.com/api/uploads/app/ojt-tracking.apk"
           download="ojt-tracking.apk"
           class="px-5 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition duration-200 shadow-md hover:shadow-lg flex items-center space-x-2"
         >
@@ -77,13 +79,23 @@
                     <p class="text-xl text-gray-600 mb-8 leading-relaxed">
                         Streamline your on-the-job training with our comprehensive tracking platform. Monitor progress, manage tasks, and achieve your career goals efficiently.
                     </p>
+                    <div v-if="isDemo" class="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
+                        <button @click="goToLogin"
+                            class="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition">
+                            <i class="fas fa-play mr-2"></i> Try the live demo
+                        </button>
+                        <a href="https://github.com/migs-tech/ojt-track" target="_blank" rel="noopener"
+                            class="px-8 py-4 bg-white border-2 border-gray-200 text-gray-800 text-lg font-semibold rounded-xl hover:border-gray-300 transition">
+                            <i class="fab fa-github mr-2"></i> View source
+                        </a>
+                    </div>
                 </div>
 
                 <!-- Right Visual -->
                 <div class="relative flex-1 w-full">
                 <div class="relative w-full h-96 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 shadow-2xl">
                     <div class="qrcode-container">
-                    <h2>Scan to download the APP</h2>
+                    <h2>{{ isDemo ? "Scan to open the demo on your phone" : "Scan to download the APP" }}</h2>
                     <qrcode-vue :value="apkUrl" :size="300" :fg-color="'#1b4ad7'" />
                     </div>
                 </div>
@@ -182,13 +194,17 @@
 import { useRouter } from 'vue-router';
 import { ref } from "vue";
 import QrcodeVue from "qrcode.vue";
+import logo from "@/assets/icon.png";
+import { isDemo } from "@/demo";
 const mobileMenuOpen = ref(false);
 
 const router = useRouter();
 const goToRegister = () => router.push("/register");
 const goToLogin = () => router.push("/login");
 
-const apkUrl = "https://ojt.kamsite.com/api/uploads/app/ojt-tracking.apk";
+const apkUrl = isDemo
+  ? window.location.origin + import.meta.env.BASE_URL
+  : "https://ojt.kamsite.com/api/uploads/app/ojt-tracking.apk";
 </script>
 
 <style scoped>

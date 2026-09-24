@@ -6,7 +6,16 @@
         <component :is="Component" />
       </keep-alive>
     </router-view>
-    <Analytics />
+    <Analytics v-if="!isDemo" />
+
+    <!-- Demo badge -->
+    <div
+      v-if="isDemo"
+      class="fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-full bg-amber-100 border border-amber-300 px-4 py-2 text-xs font-medium text-amber-800 shadow"
+    >
+      <i class="fas fa-flask"></i>
+      Demo mode · sample data only, changes reset on reload
+    </div>
 
     <!-- Logout Modal -->
     <div
@@ -34,6 +43,7 @@ import { Analytics } from "@vercel/analytics/vue";
 import { ref, onMounted } from "vue";
 import { setupInactivityListener } from "./utils/inactivity.js";
 import { useRouter } from "vue-router";
+import { isDemo } from "./demo";
 
 export default {
   name: "App",
@@ -49,7 +59,7 @@ export default {
       localStorage.removeItem("lastActive");
 
       showLogoutModal.value = false;
-      window.location.href = "/login";
+      window.location.href = import.meta.env.BASE_URL + "login";
     };
 
     onMounted(() => {
@@ -65,7 +75,7 @@ export default {
       setupInactivityListener();
     });
 
-    return { showLogoutModal, redirectLogin };
+    return { showLogoutModal, redirectLogin, isDemo };
   },
 };
 </script>

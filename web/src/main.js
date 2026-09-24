@@ -5,6 +5,9 @@ import router from "./router";
 import App from "./App.vue";
 import "flatpickr/dist/flatpickr.min.css";
 import "vue-select/dist/vue-select.css";
+import { isDemo, installDemo } from "./demo";
+
+if (isDemo) installDemo();
 
 const pinia = createPinia(); // ✅ Create Pinia instance first
 

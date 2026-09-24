@@ -11,7 +11,7 @@
             <div class="relative z-10">
                 <div class="flex items-center space-x-3 mb-16">
                     <div class="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                        <img src="/icon.png" alt="Logo" class="h-10 w-10 rounded-full" />
+                        <img :src="logo" alt="Logo" class="h-10 w-10 rounded-full" />
                     </div>
                     <span class="text-3xl font-bold text-white">OJT Tracker</span>
                 </div>
@@ -80,7 +80,7 @@
                 <div class="lg:hidden flex justify-center mb-8">
                     <div class="flex items-center space-x-2">
                         <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                            <img src="/icon.png" alt="Logo" class="h-8 w-8 rounded-full" />
+                            <img :src="logo" alt="Logo" class="h-8 w-8 rounded-full" />
                         </div>
                         <span class="text-2xl font-bold text-gray-800">OJT Tracker</span>
                     </div>
@@ -261,6 +261,7 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/useAuthStore";
+import logo from "@/assets/icon.png";
 
 const router = useRouter();
 const authStore = useAuthStore();

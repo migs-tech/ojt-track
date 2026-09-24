@@ -121,6 +121,11 @@
                         class="mb-4 p-3 rounded-lg bg-red-100 text-red-700 text-sm border border-red-300">
                         {{ errorMessage }}
                     </div>
+                    <div v-if="isDemo"
+                        class="p-3 rounded-lg bg-amber-50 text-amber-800 text-sm border border-amber-200">
+                        <i class="fas fa-flask mr-1"></i>
+                        Demo account is filled in. Just click <strong>Sign in</strong>.
+                    </div>
                     <div class="space-y-4">
                         <div>
                             <label for="admin-email" class="block text-sm font-medium text-gray-700 mb-2">
@@ -157,7 +162,7 @@
                             </div>
                         </div>
                         <!-- reCAPTCHA Section -->
-                        <div>
+                        <div v-if="!isDemo">
                             <label class="block text-sm font-medium text-gray-700 mb-2">
                                 Verify you're human
                             </label>
@@ -246,6 +251,7 @@ import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { get } from "lodash";
+import { isDemo, demoCredentials } from "@/demo";
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -275,6 +281,14 @@ const waitForGrecaptcha = () => {
 
 // Initialize reCAPTCHA once script is ready
 onMounted(async () => {
+    // reCAPTCHA is tied to the production domain, so the demo skips it.
+    if (isDemo) {
+        email.value = demoCredentials.username;
+        password.value = demoCredentials.password;
+        token.value = "demo";
+        captchaLoading.value = false;
+        return;
+    }
     const grecaptcha = await waitForGrecaptcha();
     captchaLoading.value = false;
     widgetId = grecaptcha.render("recaptcha-container", {
@@ -319,7 +333,7 @@ const handleLogin = async () => {
         router.push("app/");
     } else {
         errorMessage.value = result.message || "Invalid username or password.";
-        grecaptcha.reset(widgetId);
+        if (!isDemo) grecaptcha.reset(widgetId);
     }
 };
 

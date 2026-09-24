@@ -141,7 +141,7 @@ export const useTraineeStore = defineStore('traineeStore', {
       try {
         const response = await api.post('admin/getCompletedOjtTrainees', data);
         this.completedOjtTrainees = response.data.data;
-        totalTrainees = response.data?.pagination?.total || 0;
+        this.totalTrainees = response.data?.pagination?.total || 0;
         this.pagination = response.data.pagination;
         return response.data;
       } catch (error) {

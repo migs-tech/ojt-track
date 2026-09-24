@@ -3,7 +3,7 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import userRoutes from "./userRoutes";
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: userRoutes,
 });
 
