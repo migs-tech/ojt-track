@@ -2016,16 +2016,8 @@ class UsersController {
         if ($_SESSION['request'][$ip]['count'] >= $maxAttempts) {
             $remaining = $lockoutMinutes - floor((time() - $_SESSION['request'][$ip]['last_attempt']) / 60);
             if ($remaining < 0) $remaining = 0;
-            $memes = [
-                "😴 I'm on cooldown. Try again in {$remaining} minutes... Meanwhile, I'm still single 💔",
-                "🤖 Too many requests! Wait {$remaining} minutes. At least you have patience, unlike my ex 😂",
-                "🚫 Calm down buddy, {$remaining} minutes break. Even Netflix gives me less drama than you 🍿",
-                "🛑 Stop spamming me! {$remaining} minutes timeout... I need therapy for being single 💔🤣",
-                "⌛ Rate limit reached. Wait {$remaining} minutes... Meanwhile, go touch some grass 🌱"
-            ];
-            
             return [
-                'reply' => $memes[array_rand($memes)]
+                'reply' => "You've sent several questions in a short time. Please try again in {$remaining} minutes."
             ];
 
         }

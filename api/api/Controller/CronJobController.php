@@ -535,7 +535,7 @@ class CronJobController {
             $author = $data[0]['a'];
     
             // Notification content
-            $title = "Daily Motivation 🌟";
+            $title = "Quote of the day";
             $message = "\"{$quote}\" - {$author}";
     
             // 🔹 Get all trainees
