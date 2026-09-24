@@ -1290,6 +1290,13 @@ class UsersController {
                         'body'    => $body
                     ]);
 
+                    // Tell the trainee when the email didn't go out, instead of leaving them waiting.
+                    if (empty($mail['success'])) {
+                        return [
+                            'success' => false,
+                            'error'   => "We couldn't send the OTP email right now. Please try again in a few minutes.",
+                        ];
+                    }
                     if (!empty($mail['success'])) {
                         $this->notification->sendNotificationByUserId(
                             $traineeId,
