@@ -21,7 +21,7 @@
             Register
           </button>
           <a
-            :href="apkDownloadUrl"
+            :href="apkDownloadUrl" @click="onDownload"
             class="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition duration-200 shadow-md hover:shadow-lg flex items-center space-x-2"
           >
             <i class="fas fa-mobile-alt text-white"></i>
@@ -47,7 +47,7 @@
           Register
         </button>
         <a
-          :href="apkDownloadUrl"
+          :href="apkDownloadUrl" @click="onDownload"
           class="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition duration-200 shadow-md flex items-center justify-center space-x-2"
         >
           <i class="fas fa-mobile-alt text-white"></i>
@@ -197,7 +197,7 @@
                             <i class="fas fa-check-circle text-green-500 mt-1"></i><span>{{ point }}</span>
                         </li>
                     </ul>
-                    <a :href="apkDownloadUrl" class="inline-flex items-center gap-3 px-8 py-4 bg-green-600 text-white text-lg font-semibold rounded-xl shadow-lg hover:bg-green-700 hover:shadow-xl transition">
+                    <a :href="apkDownloadUrl" @click="onDownload" class="inline-flex items-center gap-3 px-8 py-4 bg-green-600 text-white text-lg font-semibold rounded-xl shadow-lg hover:bg-green-700 hover:shadow-xl transition">
                         <i class="fab fa-android text-2xl"></i>
                         <span class="text-left leading-tight">Download App<br /><span class="text-xs font-normal text-green-100">Android 8.0 or higher</span></span>
                     </a>
@@ -304,7 +304,7 @@
                 <h2 class="text-3xl md:text-4xl font-bold mb-4">Ready to track your OJT?</h2>
                 <p class="text-lg text-blue-100 mb-8 max-w-xl mx-auto">Trainees and supervisors: get the app. OJT coordinators: create your account on the web portal.</p>
                 <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                    <a :href="apkDownloadUrl" class="px-8 py-4 bg-white text-blue-700 font-semibold rounded-xl shadow hover:bg-blue-50 transition">
+                    <a :href="apkDownloadUrl" @click="onDownload" class="px-8 py-4 bg-white text-blue-700 font-semibold rounded-xl shadow hover:bg-blue-50 transition">
                         <i class="fas fa-mobile-alt mr-2"></i>Download App
                     </a>
                     <button @click="goToRegister" class="px-8 py-4 border-2 border-white/70 text-white font-semibold rounded-xl hover:bg-white/10 transition">
@@ -329,7 +329,7 @@
                 <div>
                     <h4 class="text-white font-semibold mb-4">Get started</h4>
                     <ul class="space-y-2">
-                        <li><a :href="apkDownloadUrl" class="hover:text-white transition">Download the app</a></li>
+                        <li><a :href="apkDownloadUrl" @click="onDownload" class="hover:text-white transition">Download the app</a></li>
                         <li><button @click="goToLogin" class="hover:text-white transition">Login</button></li>
                         <li><button @click="goToRegister" class="hover:text-white transition">Coordinator sign up</button></li>
                     </ul>
@@ -354,10 +354,16 @@ import { useRouter } from 'vue-router';
 import { ref } from "vue";
 import logo from "@/assets/icon.png";
 import { isDemo } from "@/demo";
+import { toast } from "@/ui/feedback";
 const mobileMenuOpen = ref(false);
 
 const router = useRouter();
 const goToRegister = () => router.push("/register");
+
+// The link downloads the APK directly; tell people it started and how to install it.
+const onDownload = () => {
+  toast("Download started (about 115 MB). When it finishes, open ojt-track.apk to install. If Android asks, allow installing from your browser.", "info", 9000);
+};
 const goToLogin = () => router.push("/login");
 
 // "Download App" link for the Android APK. By default it points to the APK attached to the
