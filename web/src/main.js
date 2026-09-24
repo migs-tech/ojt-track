@@ -5,6 +5,7 @@ import router from "./router";
 import App from "./App.vue";
 import "flatpickr/dist/flatpickr.min.css";
 import "vue-select/dist/vue-select.css";
+import "./assets/ui.css";
 import { isDemo, installDemo } from "./demo";
 
 if (isDemo) installDemo();

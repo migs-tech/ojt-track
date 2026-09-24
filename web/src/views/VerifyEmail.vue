@@ -33,12 +33,12 @@
         <p class="text-gray-600 mb-6">
           Your email has been successfully verified. You can now access all features of your account.
         </p>
-        <a
-          href="/login"
+        <router-link
+          :to="{ name: 'Login' }"
           class="inline-block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl shadow-lg hover:opacity-90 transition"
         >
           Go to Login
-        </a>
+        </router-link>
       </div>
 
       <!-- Failure -->
@@ -48,14 +48,14 @@
         </svg>
         <h2 class="text-2xl font-bold text-gray-800 mb-2">Verification Failed</h2>
         <p class="text-gray-600 mb-6">
-          The verification link is invalid or has expired. Please request a new one.
+          The verification link is invalid or has expired. Sign in to the OJT Track app to get a new one.
         </p>
-        <a
-          href="/resend-verification"
+        <router-link
+          :to="{ name: 'LandingPage' }"
           class="inline-block bg-gradient-to-r from-red-500 to-pink-500 text-white px-6 py-3 rounded-xl shadow-lg hover:opacity-90 transition"
         >
-          Resend Email
-        </a>
+          Back to home
+        </router-link>
       </div>
     </div>
   </div>

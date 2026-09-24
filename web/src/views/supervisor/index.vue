@@ -256,11 +256,10 @@ const onSearch = () => {
 };
 
 onMounted(async () => {
-  if (supervisorStore.supervisors.length === 0) {
-    loading.value = true;
-    await fetchData();
-    loading.value = false;
-  }
+  // Show the loader only the first time; later visits show the last rows while refreshing
+  loading.value = supervisorStore.supervisors.length === 0;
+  await fetchData();
+  loading.value = false;
 });
 </script>
 

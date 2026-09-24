@@ -7,6 +7,7 @@
       </keep-alive>
     </router-view>
     <Analytics v-if="!isDemo" />
+    <UiFeedback />
 
     <!-- Demo badge -->
     <div
@@ -40,6 +41,7 @@
 
 <script>
 import { Analytics } from "@vercel/analytics/vue";
+import UiFeedback from "./components/UiFeedback.vue";
 import { ref, onMounted } from "vue";
 import { setupInactivityListener } from "./utils/inactivity.js";
 import { useRouter } from "vue-router";
@@ -47,7 +49,7 @@ import { isDemo } from "./demo";
 
 export default {
   name: "App",
-  components: { Analytics },
+  components: { Analytics, UiFeedback },
   setup() {
     const showLogoutModal = ref(false);
     const router = useRouter();

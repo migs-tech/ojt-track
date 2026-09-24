@@ -19,6 +19,7 @@
         v-for="item in menuItems"
         :key="item.name"
         :to="item.to"
+        :title="item.label"
         :class="[
           'flex items-center gap-3 px-3 py-2 rounded-md transition',
           isActive(item.to)
@@ -48,6 +49,7 @@
 import { useRoute, useRouter } from "vue-router";
 import logo from "@/assets/icon.png";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { confirmDialog } from "@/ui/feedback";
 
 export default {
   setup() {
@@ -57,6 +59,13 @@ export default {
   const userRole = authStore.user.role;
 
   const handleLogout = async () => {
+    const ok = await confirmDialog({
+      title: "Log out?",
+      message: "You will need to sign in again to use the dashboard.",
+      confirmText: "Log out",
+      icon: "fa-right-from-bracket",
+    });
+    if (!ok) return;
     await authStore.logout();
     location.reload();
   };

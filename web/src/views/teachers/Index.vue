@@ -1,11 +1,6 @@
 <template>
     <LoadingScreen :show="loading" />
     <div class="relative">
-        <Alert
-            v-model:show="alert.show"
-            :type="alert.type"
-            :message="alert.message"
-        />
         <div v-if="!loading" class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
             <!-- Enhanced Header -->
             <div class="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
@@ -69,13 +64,14 @@
                                     Pending
                                 </span>
                             </td>
-                            <td class="px-6 py-4 text-right relative">
+                            <td class="px-6 py-4 text-right relative" data-row-menu>
                                 <button
                                     @click="toggleMenu(index)"
                                     class="p-2 rounded-lg hover:bg-gray-200 transition-colors duration-150 text-gray-600 hover:text-gray-900"
                                 >
                                     <i class="fas fa-ellipsis-v"></i>
                                 </button>
+                                <transition name="dropdown">
                                 <div
                                     v-if="activeMenu === index"
                                     class="absolute right-8 mt-2 w-40 bg-white border border-gray-200 rounded-xl shadow-xl z-10 overflow-hidden"
@@ -98,6 +94,7 @@
                                         Delete
                                     </button>
                                 </div>
+                                </transition>
                             </td>
                         </tr>
                     </tbody>
@@ -362,14 +359,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { toast } from "@/ui/feedback";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import ModalComponent from "@/components/ModalComponent.vue";
 import LoadingScreen from "@/components/LoadingScreen.vue";
 import { useTeacherStore } from "@/stores/teacherStore";
-import Alert from "@/components/Alert.vue";
 import StatusModal from "@/components/StatusModal.vue";
 
-const alert = ref({ show: false, type: 'success', message: '' });
 
 const teacherStore = useTeacherStore();
 const loading = ref(false);
@@ -401,7 +397,19 @@ function handleAvatar(event) {
 const toggleMenu = (i) => (activeMenu.value = activeMenu.value === i ? null : i);
 const closeModal = () => (modal.value = { view: false, edit: false, delete: false, verify: false, add: false });
 
-const openAddModal = () => (modal.value.add = true);
+// Start the add form empty (it may still hold the last teacher that was edited)
+const openAddModal = () => {
+    form.value = { teacher_name: '', username: '', password: '', avatar: null };
+    avatarPreview.value = null;
+    modal.value.add = true;
+};
+
+// Close the row menu when clicking outside it
+const onDocClick = (e) => {
+    if (activeMenu.value !== null && !e.target.closest('[data-row-menu]')) activeMenu.value = null;
+};
+onMounted(() => document.addEventListener('click', onDocClick));
+onBeforeUnmount(() => document.removeEventListener('click', onDocClick));
 
 const viewTeacher = (t) => {
     selectedTeacher.value = t;
@@ -411,7 +419,8 @@ const viewTeacher = (t) => {
 
 const editTeacher = (t) => {
     selectedTeacher.value = t;
-    form.value = { ...t };
+    form.value = { ...t, password: '', avatar: null };
+    avatarPreview.value = t.avatar_url || null;
     modal.value.edit = true;
     activeMenu.value = null;
 };
@@ -429,6 +438,10 @@ const verifyTeacher = (t) => {
 };
 
 const saveTeacher = async () => {
+    if (!form.value.teacher_name?.trim() || !form.value.username?.trim() || !form.value.password) {
+        toast('Please fill in the name, username and password.', 'error');
+        return;
+    }
     try {
         const fd = new FormData();
         fd.append("teacher_name", form.value.teacher_name);
@@ -440,12 +453,11 @@ const saveTeacher = async () => {
         closeModal();
         statusUpdating.value = true;
         messageStatus.value = "Saving teacher, please wait...";
-        await new Promise(resolve => setTimeout(resolve, 800));
         const res = await teacherStore.addTeacher(fd);
         if (res.success) {
-            alert.value = { show: true, type: 'success', message: 'Teacher saved successfully.' };
+            toast('Teacher saved successfully.', "success");
         } else {
-            alert.value = { show: true, type: 'error', message: res.message || 'Failed to save teacher.' };
+            toast(res.message || 'Failed to save teacher.', "error");
         }
     } catch (err) {
         console.error("Error saving teacher:", err);
@@ -468,12 +480,11 @@ const saveEditTeacher = async () => {
     closeModal();
     statusUpdating.value = true;
     messageStatus.value = "Updating teacher, please wait...";
-    await new Promise(resolve => setTimeout(resolve, 800));
     const res = await teacherStore.updateTeacher(formData);
     if (res.success) {
-        alert.value = { show: true, type: 'success', message: 'Teacher updated successfully.' };
+        toast('Teacher updated successfully.', "success");
     } else {
-        alert.value = { show: true, type: 'error', message: res.message || 'Failed to update teacher.' };
+        toast(res.message || 'Failed to update teacher.', "error");
     }
     statusUpdating.value = false;
     messageStatus.value = "";
@@ -483,12 +494,11 @@ const confirmDelete = async () => {
     closeModal();
     statusUpdating.value = true;
     messageStatus.value = "Deleting teacher, please wait...";
-    await new Promise(resolve => setTimeout(resolve, 500));
     const res = await teacherStore.deleteTeacher(selectedTeacher.value.teacher_id);
     if (res.success) {
-        alert.value = { show: true, type: 'success', message: 'Teacher deleted successfully.' };
+        toast('Teacher deleted successfully.', "success");
     } else {
-        alert.value = { show: true, type: 'error', message: res.message || 'Failed to delete teacher.' };
+        toast(res.message || 'Failed to delete teacher.', "error");
     }
     statusUpdating.value = false;
     messageStatus.value = "";
@@ -498,12 +508,11 @@ const confirmVerify = async () => {
     closeModal();
     statusUpdating.value = true;
     messageStatus.value = "Verifying teacher, please wait...";
-    await new Promise(resolve => setTimeout(resolve, 500));
     const res = await teacherStore.verifyTeacherAccount(selectedTeacher.value.teacher_id);
     if (res.success) {
-        alert.value = { show: true, type: 'success', message: 'Teacher verified successfully.' };
+        toast('Teacher verified successfully.', "success");
     } else {
-        alert.value = { show: true, type: 'error', message: res.message || 'Failed to verify teacher.' };
+        toast(res.message || 'Failed to verify teacher.', "error");
     }
     statusUpdating.value = false;
 };

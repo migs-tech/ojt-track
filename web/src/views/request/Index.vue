@@ -1,11 +1,6 @@
 <template>
   <LoadingScreen :show="loading" />
   <div class="relative">
-    <Alert
-      v-model:show="alert.show"
-      :type="alert.type"
-      :message="alert.message"
-    />
     
     <div v-if="!loading" class="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-xl overflow-hidden border border-gray-200">
       <!-- Enhanced Header -->
@@ -106,7 +101,7 @@
               <td class="px-6 py-4">
                 <div class="flex justify-end gap-2">
                   <button
-                    @click="respondToRequest(request, 'approved')"
+                    @click="acceptRequest(request)"
                     class="group/btn relative px-5 py-2.5 rounded-xl bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center gap-2"
                   >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -285,8 +280,8 @@
 import { computed, onMounted, ref } from "vue";
 import { useTraineeStore } from "@/stores/traineeStore";
 import LoadingScreen from "@/components/LoadingScreen.vue";
-import Alert from "@/components/Alert.vue";
 import StatusModal from "@/components/StatusModal.vue";
+import { confirmDialog, toast } from "@/ui/feedback";
 
 const traineeStore = useTraineeStore();
 const loading = ref(false);
@@ -302,17 +297,25 @@ const rejectReason = ref("");
 const selectedRequest = ref(null);
 const reasonError = ref("");
 
-const fetchData = async (page = 1) => {
-  loading.value = true;
+const fetchData = async (page = 1, showLoader = true) => {
+  loading.value = showLoader;
   await traineeStore.getReportRequest(page);
   loading.value = false;
 };
 
-const alert = ref({
-  show: false,
-  type: "success",
-  message: "",
-});
+const capitalize = (v) => (v ? String(v).charAt(0).toUpperCase() + String(v).slice(1) : "");
+
+const acceptRequest = async (request) => {
+  const ok = await confirmDialog({
+    title: "Accept this request?",
+    message: `${capitalize(request.request_type)} report for ${request.name} (${request.period}). It will be generated and emailed.`,
+    confirmText: "Accept",
+    tone: "success",
+    icon: "fa-check",
+  });
+  if (ok) await respondToRequest(request, "approved");
+};
+
 
 const statusUpdating = ref(false);
 
@@ -324,21 +327,14 @@ const respondToRequest = async (request, status, reason = null) => {
     const res = await traineeStore.updateReportRequestStatus(payload);
     console.log('Update Response:', res);
     if (res.success) {
-      alert.value = {
-        show: true,
-        type: "success",
-        message: `Request ${status} successfully.`,
-      };
-      await fetchData(pagination.value.page);
+      toast(`Request ${status} successfully.`, "success");
+      await fetchData(pagination.value.page, false);
     } else {
-      alert.value = {
-        show: true,
-        type: "error",
-        message: res.message || `Failed to update request.`,
-      };
+      toast(res.message || `Failed to update request.`, "error");
     }
   } catch (error) {
     console.error(`Error updating request (${status}):`, error);
+    toast("Couldn't update the request. Please try again.", "error");
   } finally {
     statusUpdating.value = false;
   }
@@ -380,8 +376,7 @@ const getInitials = (name) => {
 };
 
 onMounted(() => {
-  if (requests.value.length === 0) {
-    fetchData();
-  }
+  // Always refresh; show the loader only when there is nothing to show yet
+  fetchData(1, requests.value.length === 0);
 });
 </script>

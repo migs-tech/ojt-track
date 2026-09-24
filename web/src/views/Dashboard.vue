@@ -2,9 +2,9 @@
   <!-- Dashboard Cards -->
   <LoadingScreen :show="loading" />
   <div v-if="!loading" class="">
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6 stagger">
       <!-- Total Trainees -->
-      <div class="bg-white p-5 rounded-xl shadow hover:shadow-lg transition">
+      <div class="bg-white p-5 rounded-xl shadow hover:shadow-lg hover:-translate-y-0.5 transition duration-200">
         <h3 class="text-sm text-gray-500">Total Trainees</h3>
         <p class="text-3xl font-bold text-indigo-600">
           <i class="fas fa-user-graduate mr-2"></i>{{ totalTrainees }}
@@ -12,7 +12,7 @@
       </div>
 
       <!-- Total Supervisors -->
-      <div class="bg-white p-5 rounded-xl shadow hover:shadow-lg transition">
+      <div class="bg-white p-5 rounded-xl shadow hover:shadow-lg hover:-translate-y-0.5 transition duration-200">
         <h3 class="text-sm text-gray-500">Total Supervisors</h3>
         <p class="text-3xl font-bold text-green-500">
           <i class="fas fa-user-tie mr-2"></i>{{ totalSupervisors }}
@@ -20,7 +20,7 @@
       </div>
 
       <!-- Total Users -->
-      <div class="bg-white p-5 rounded-xl shadow hover:shadow-lg transition">
+      <div class="bg-white p-5 rounded-xl shadow hover:shadow-lg hover:-translate-y-0.5 transition duration-200">
         <h3 class="text-sm text-gray-500">Total Users</h3>
         <p class="text-3xl font-bold text-yellow-500">
           <i class="fas fa-users mr-2"></i>{{ totalUsers }}
@@ -28,7 +28,7 @@
       </div>
 
       <!-- Completed OJT -->
-      <div class="bg-white p-5 rounded-xl shadow hover:shadow-lg transition">
+      <div class="bg-white p-5 rounded-xl shadow hover:shadow-lg hover:-translate-y-0.5 transition duration-200">
         <h3 class="text-sm text-gray-500">Completed OJT</h3>
         <p class="text-3xl font-bold text-purple-600">
           <i class="fas fa-check-circle mr-2"></i>
@@ -42,13 +42,13 @@
     </div>
 
     <!-- Charts -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 stagger">
       <attendance-bar-chart />
       <ojt-hours-completion-pie-chart />
     </div>
 
     <!-- Table -->
-    <div class="bg-white rounded-xl shadow overflow-hidden">
+    <div class="bg-white rounded-xl shadow overflow-hidden rise-in">
       <div class="p-4 border-b bg-gray-50">
         <h3 class="text-lg font-semibold text-gray-700">Recent Trainee Evaluation</h3>
       </div>
@@ -77,6 +77,12 @@
                 {{ new Date(evaluation.date).toLocaleDateString() }}
               </td>
             </tr>
+            <tr v-if="!recentOjtEvaluations?.length">
+              <td colspan="5" class="px-4 py-10 text-center text-gray-400">
+                <i class="fas fa-clipboard-list text-3xl mb-2 block"></i>
+                No evaluations yet. They appear here when supervisors evaluate trainees in the app.
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -101,9 +107,11 @@ const recentOjtEvaluations = computed(() => store.recentOjtEvaluations);
 const ojtHoursCompletionPieChart = computed(() => store.ojtHoursCompletionPieChart);
 
 onMounted(async () => {
+  loading.value = !store.totalTrainees;
   await Promise.all([
     store.fetchDashboardStats(),
     store.fetchRecentEvaluations(),
   ]);
+  loading.value = false;
 });
 </script>

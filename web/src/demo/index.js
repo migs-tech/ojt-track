@@ -48,6 +48,10 @@ const routes = {
     message: "Registration is turned off in the demo. Use the demo account to sign in.",
   }),
   "user/verifyEmailToken": () => ({ success: false, message: "Not available in the demo." }),
+  "user/forgotPassword": () => ({
+    success: false,
+    message: "Password reset is turned off in the demo. The demo account is already filled in on the login page.",
+  }),
 
   "dashboard/getDashboardData": () => ({
     total_trainees: db.trainees.length,

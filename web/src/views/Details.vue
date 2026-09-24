@@ -4,7 +4,7 @@
     <!-- Back Button -->
     <div class="mb-4">
       <button
-        @click="$router.back()"
+        @click="goBack"
         class="group flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-indigo-600 transition-all duration-200 hover:gap-3"
       >
         <i class="fas fa-arrow-left"></i>
@@ -16,7 +16,7 @@
     <div class="bg-white rounded-xl shadow-sm p-5 mb-5 border border-gray-200">
       <div class="flex items-start gap-4">
         <img
-          :src="traineeDetails?.avatar_url || 'https://i.pravatar.cc/100?img=3'"
+          :src="traineeDetails?.avatar_url || 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png'"
           alt="Profile"
           class="w-16 h-16 rounded-lg border-2 border-indigo-400 object-cover flex-shrink-0"
         />
@@ -204,6 +204,10 @@ import { useTraineeStore } from "@/stores/traineeStore";
 import LoadingScreen from "@/components/LoadingScreen.vue";
 
 const router = useRouter();
+const goBack = () => {
+  if (window.history.state?.back) router.back();
+  else router.push({ name: "CompletedTrainees" });
+};
 const traineeStore = useTraineeStore();
 const { traineeDetails } = storeToRefs(traineeStore);
 const traineeId = router.currentRoute.value.params.id;

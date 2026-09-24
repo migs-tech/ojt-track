@@ -1,13 +1,9 @@
 <template>
+  <LoadingScreen :show="loading" />
   <div class="relative">
-    <Alert
-      v-model:show="alert.show"
-      :type="alert.type"
-      :message="alert.message"
-    />
     
     <!-- Enhanced Table -->
-    <div class="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-xl overflow-hidden border border-gray-200">
+    <div v-if="!loading" class="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-xl overflow-hidden border border-gray-200">
       <!-- Enhanced Header -->
       <div class="p-6 bg-white border-b border-indigo-500">
         <div class="flex items-center justify-between">
@@ -277,9 +273,9 @@
 </template>
 
 <script setup>
+import { toast } from "@/ui/feedback";
 import { ref, onMounted, watch } from "vue";
-import Modal from "@/components/Modal.vue";
-import Alert from "@/components/Alert.vue";
+import LoadingScreen from "@/components/LoadingScreen.vue";
 import vSelect from "vue-select";
 import { useTraineeStore } from "@/stores/traineeStore";
 import { useSupervisorStore } from "@/stores/supervisorStore";
@@ -307,11 +303,6 @@ const showModal = ref(false);
 const selectedTrainee = ref(null);
 const selectedSupervisor = ref(null);
 
-const alert = ref({
-  show: false,
-  type: "success",
-  message: "",
-});
 
 const openModal = (trainee) => {
   selectedTrainee.value = trainee;
@@ -323,7 +314,7 @@ const confirming = ref(false);
 
 const confirmAssign = async () => {
   if (!selectedSupervisor.value) {
-    alert.value = { show: true, type: "error", message: "Please select a supervisor." };
+    toast("Please select a supervisor.", "error");
     return;
   }
   confirming.value = true;
@@ -336,35 +327,26 @@ const confirmAssign = async () => {
   console.log("Assign response:", res);
 
   if (!res?.success) {
-    alert.value = { 
-      show: true, 
-      type: "error", 
-      message: res?.message || "Failed to assign supervisor." 
-    };
+    toast(res?.message || "Failed to assign supervisor.", "error");
     confirming.value = false;
     return;
   }
 
-  trainees.value = trainees.value.filter(
-    (t) => t.trainee_id !== selectedTrainee.value.trainee_id
-  );
+  // Reload the page so the next unassigned trainee moves up (or go back a page if this one is now empty)
+  const page = trainees.value.length === 1 && pagination.value.page > 1 ? pagination.value.page - 1 : pagination.value.page;
+  await fetchData(page);
 
-  pagination.value.total -= 1;
-  pagination.value.totalPages = Math.ceil(pagination.value.total / 5);
-
-  alert.value = {
-    show: true,
-    type: "success",
-    message: `${selectedSupervisor.value.name} assigned to ${selectedTrainee.value.trainee_name}`,
-  };
+  toast(`${selectedSupervisor.value.name} assigned to ${selectedTrainee.value.trainee_name}`, "success");
   confirming.value = false;
   showModal.value = false;
 };
 
+const loading = ref(true);
+
 const fetchData = async (page = 1) => {
   const data = await traineeStore.fetchUnassignedTrainees(page);
-  trainees.value = data.results;
-  pagination.value = data.pagination;
+  trainees.value = data?.results || [];
+  pagination.value = data?.pagination || { page: 1, total: 0, totalPages: 1 };
 };
 
 const changePage = (newPage) => {
@@ -381,43 +363,37 @@ const getInitials = (name) => {
     .slice(0, 2);
 };
 
-onMounted(() => {
-  fetchData();
-  fetchSupervisors();
+onMounted(async () => {
+  await Promise.all([fetchData(), fetchSupervisors()]);
+  loading.value = false;
 });
 </script>
 
 <style>
 /* Custom Vue Select Styling */
 .custom-v-select .vs__dropdown-toggle {
-  @apply border-2 border-gray-200 rounded-xl p-2 hover:border-indigo-300 transition-all;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.75rem;
+  padding: 0.5rem;
+  transition: border-color 0.15s ease;
 }
-
+.custom-v-select .vs__dropdown-toggle:hover {
+  border-color: #a5b4fc;
+}
 .custom-v-select .vs__dropdown-menu {
-  @apply border-2 border-gray-200 rounded-xl shadow-xl mt-1;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.75rem;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+  margin-top: 0.25rem;
 }
-
-.custom-v-select .vs__dropdown-option {
-  @apply hover:bg-indigo-50 transition-colors;
-}
-
 .custom-v-select .vs__dropdown-option--highlight {
-  @apply bg-indigo-100 text-gray-900;
+  background: #e0e7ff;
+  color: #111827;
 }
-
-.custom-v-select .vs__search {
-  @apply text-gray-700;
-}
-
 .custom-v-select .vs__search::placeholder {
-  @apply text-gray-400;
+  color: #9ca3af;
 }
-
 .custom-v-select .vs__selected {
-  @apply m-0;
-}
-
-.custom-v-select .vs__clear {
-  @apply hover:bg-red-100 rounded-full transition-colors;
+  margin: 0;
 }
 </style>

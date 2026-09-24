@@ -77,12 +77,15 @@
                 </div>
             </div>
             <div class="relative z-10 text-gray-400">
-                <p class="text-sm">&copy; 2024 OJT Tracker. All rights reserved.</p>
+                <p class="text-sm">&copy; {{ new Date().getFullYear() }} OJT Tracker. All rights reserved.</p>
             </div>
         </div>
         <!-- Right Side - Admin Login Form -->
         <div class="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-50">
-            <div class="w-full max-w-md space-y-8">
+            <div class="w-full max-w-md space-y-8 rise-in">
+                <router-link :to="{ name: 'LandingPage' }" class="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-indigo-600 transition">
+                    <i class="fas fa-arrow-left"></i> Back to home
+                </router-link>
                 <!-- Mobile Logo -->
                 <div class="lg:hidden flex justify-center mb-8">
                     <div class="flex items-center space-x-2">
@@ -145,9 +148,14 @@
                             </div>
                         </div>
                         <div>
-                            <label for="admin-password" class="block text-sm font-medium text-gray-700 mb-2">
-                                Password
-                            </label>
+                            <div class="flex items-center justify-between mb-2">
+                                <label for="admin-password" class="block text-sm font-medium text-gray-700">
+                                    Password
+                                </label>
+                                <router-link :to="{ name: 'ForgotPassword' }" class="text-sm font-medium text-indigo-600 hover:text-indigo-500">
+                                    Forgot password?
+                                </router-link>
+                            </div>
                             <div class="relative">
                                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -2,14 +2,16 @@
   <header class="bg-gradient-to-r primary-bg text-white px-6 py-4 shadow-md flex justify-between items-center">
     <div class="flex items-center gap-4">
       <!-- Emit toggle event -->
-      <button @click="$emit('toggle')" class="text-white text-xl focus:outline-none">
+      <button @click="$emit('toggle')" class="text-white text-xl focus:outline-none hover:opacity-80 transition" aria-label="Toggle menu">
         <i class="fas fa-bars"></i>
       </button>
-      <h2 class="text-2xl font-semibold topbar-title">Dashboard</h2>
+      <transition name="fade" mode="out-in">
+        <h2 :key="pageTitle" class="text-2xl font-semibold topbar-title">{{ pageTitle }}</h2>
+      </transition>
     </div>
-    <div class="relative">
+    <div ref="menuEl" class="relative">
     <div
-      class="flex items-center gap-3 cursor-pointer"
+      class="flex items-center gap-3 cursor-pointer select-none rounded-full pl-3 pr-1 py-1 hover:bg-white/10 transition"
       @click="dropdownOpen = !dropdownOpen"
     >
       <span class="text-sm">{{ authStore.user?.username || 'Guest' }}</span>
@@ -20,13 +22,16 @@
       />
     </div>
 
+    <transition name="dropdown">
     <div
       v-if="dropdownOpen"
-      class="absolute right-0 mt-2 w-40 bg-white text-gray-800 rounded shadow-lg z-50"
+      class="absolute right-0 mt-2 w-44 bg-white text-gray-800 rounded-lg shadow-lg z-50 overflow-hidden py-1"
     >
-      <a href="#" @click.prevent="view" class="block px-4 py-2 hover:bg-gray-100">View Profile</a>
+      <a href="#" @click.prevent="view" class="flex items-center gap-2 px-4 py-2 hover:bg-gray-100"><i class="fas fa-user text-gray-400 w-4"></i>View Profile</a>
+      <a href="#" @click.prevent="logout" class="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 text-red-600"><i class="fas fa-right-from-bracket w-4"></i>Log out</a>
       <!-- <a href="#" @click.prevent="editTeacher" class="block px-4 py-2 hover:bg-gray-100">Edit Profile</a> -->
     </div>
+    </transition>
   </div>
   </header>
   <ModalComponent
@@ -155,12 +160,38 @@
     </ModalComponent>
 </template>
  <script setup>
-    import { ref } from 'vue';
+    import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+    import { useRoute } from 'vue-router';
+    import { toast, confirmDialog } from '@/ui/feedback';
     import { useAuthStore } from '@/stores/useAuthStore';
     import ModalComponent from "@/components/ModalComponent.vue";
     import { useTeacherStore } from "@/stores/teacherStore";
+    defineEmits(['toggle']);
     const authStore = useAuthStore();
     const dropdownOpen = ref(false);
+    const route = useRoute();
+    const pageTitle = computed(() => route.meta.title || 'Dashboard');
+
+    // Close the profile menu when clicking anywhere else
+    const menuEl = ref(null);
+    const onDocClick = (e) => {
+      if (dropdownOpen.value && menuEl.value && !menuEl.value.contains(e.target)) dropdownOpen.value = false;
+    };
+    onMounted(() => document.addEventListener('click', onDocClick));
+    onBeforeUnmount(() => document.removeEventListener('click', onDocClick));
+
+    const logout = async () => {
+      dropdownOpen.value = false;
+      const ok = await confirmDialog({
+        title: 'Log out?',
+        message: 'You will need to sign in again to use the dashboard.',
+        confirmText: 'Log out',
+        icon: 'fa-right-from-bracket',
+      });
+      if (!ok) return;
+      await authStore.logout();
+      location.reload();
+    };
     const modal = ref({
         view: false,
         edit: false
@@ -211,11 +242,11 @@ function handleAvatar(event) {
         try {
            const res = await teacherStore.updateTeacher(formData);
            console.log(res);
-            alert('Profile updated successfully!');
+            toast('Profile updated successfully.');
             closeModal();
         } catch (error) {
             console.error('Error updating profile:', error);
-            alert('Failed to update profile. Please try again.');
+            toast('Failed to update profile. Please try again.', 'error');
         }
     };
 

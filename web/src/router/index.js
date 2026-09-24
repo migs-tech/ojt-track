@@ -22,7 +22,16 @@ router.beforeEach((to, from, next) => {
     return next({ name: "Home" });
   }
 
+  // Coordinators don't have the dashboard or teacher management; send them to their start page
+  if (to.meta.adminOnly && Number(authStore.user?.role) !== 4) {
+    return next({ name: "Trainees" });
+  }
+
   next();
+});
+
+router.afterEach((to) => {
+  document.title = to.meta.title ? `${to.meta.title} · OJT Track` : "OJT Track";
 });
 
 export default router;

@@ -6,7 +6,7 @@
     <!-- Top Bar -->
     <div class="flex justify-between items-center mb-6">
       <button
-        @click="$router.back()"
+        @click="goBack"
         class="flex items-center gap-2 text-gray-600 hover:text-indigo-600 transition"
       >
         <i class="fas fa-arrow-left"></i>
@@ -26,7 +26,7 @@
     <div class="bg-white rounded-xl shadow p-6 mb-6">
       <div class="flex gap-4">
         <img
-          :src="traineeDetails?.avatar_url || 'https://i.pravatar.cc/100?img=3'"
+          :src="traineeDetails?.avatar_url || 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png'"
           class="w-16 h-16 rounded-lg object-cover"
         />
 
@@ -182,8 +182,13 @@ import { onMounted, watch, computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useTraineeStore } from "@/stores/traineeStore";
 import LoadingScreen from "@/components/LoadingScreen.vue";
+import { toast } from "@/ui/feedback";
 
 const router = useRouter();
+const goBack = () => {
+  if (window.history.state?.back) router.back();
+  else router.push({ name: "Trainees" });
+};
 const traineeStore = useTraineeStore();
 const { traineeDetails } = storeToRefs(traineeStore);
 const traineeId = router.currentRoute.value.params.id;
@@ -240,15 +245,15 @@ const generatePDF = async () => {
         `width=${popupWidth},height=${popupHeight},top=${top},left=${left},resizable=yes,scrollbars=yes`
       );
 
-      console.log("PDF opened in popup window:", res.url);
+      toast("PDF ready. It opened in a new window.");
     } else {
       console.error("PDF generation failed:", res.message);
-      alert(res.message || "Failed to generate PDF");
+      toast(res.message || "Failed to generate PDF", "error");
     }
 
   } catch (error) {
     console.error("Error generating PDF:", error);
-    alert("Error generating PDF, please try again.");
+    toast("Error generating PDF, please try again.", "error");
   } finally {
     isGenerating.value = false;
   }

@@ -131,7 +131,7 @@
               </td>
             </tr>
             <tr v-if="trainees.length === 0">
-              <td colspan="4" class="px-6 py-16">
+              <td colspan="5" class="px-6 py-16">
                 <div class="flex flex-col items-center justify-center text-gray-400">
                   <i class="fas fa-users text-5xl mb-4 opacity-50"></i>
                   <p class="text-lg font-semibold text-gray-500">No trainees found</p>
@@ -289,11 +289,10 @@ const onSearch = () => {
 };
 
 onMounted(async () => {
-  if (traineeStore.completedOjtTrainees.length === 0) {
-    loading.value = true;
-    await fetchData();
-    loading.value = false;
-  }
+  // Show the loader only the first time; later visits show the last rows while refreshing
+  loading.value = traineeStore.completedOjtTrainees.length === 0;
+  await fetchData();
+  loading.value = false;
 });
 </script>
 
