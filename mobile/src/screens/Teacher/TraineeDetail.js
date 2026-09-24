@@ -9,6 +9,7 @@ import {
   FlatList,
   ActivityIndicator,
   TouchableOpacity,
+  Alert,
 } from "react-native";
 import { FontAwesome5, MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -106,12 +107,18 @@ export default function TraineeDetailsScreen({ route }) {
               </View>
               <TouchableOpacity
                 style={styles.evaluateButton}
-                onPress={() =>
-                  navigation.navigate("EvaluationPage", {
+                onPress={() => {
+                  const params = {
                     traineeId: item?.trainee_id,
                     traineeName: traineeData?.trainee?.trainee_name,
-                  })
-                }
+                  };
+                  // Midterm/Final evaluation (as in the study) or the 12-item OJT evaluation form
+                  Alert.alert("Evaluate Trainee", "Choose the evaluation to fill out:", [
+                    { text: "Midterm / Final", onPress: () => navigation.navigate("SupervisorEvaluation", params) },
+                    { text: "Evaluation Form", onPress: () => navigation.navigate("EvaluationPage", params) },
+                    { text: "Cancel", style: "cancel" },
+                  ]);
+                }}
               >
                 <Ionicons name="clipboard-outline" size={18} color="#3B82F6" />
               </TouchableOpacity>

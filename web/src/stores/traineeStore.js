@@ -29,47 +29,6 @@ export const useTraineeStore = defineStore('traineeStore', {
       }
     },
 
-    async addTrainee(traineeData) {
-      this.loading = true;
-      try {
-        const response = await api.post('/trainees', traineeData);
-        this.trainees.push(response.data);
-        this.totalTrainees += 1;
-      } catch (error) {
-        console.error('Error adding trainee:', error);
-      } finally {
-        this.loading = false;
-      }
-    },
-
-    async updateTrainee(id, traineeData) {
-      this.loading = true;
-      try {
-        const response = await api.put(`/trainees/${id}`, traineeData);
-        const index = this.trainees.findIndex(t => t.id === id);
-        if (index !== -1) {
-          this.trainees[index] = response.data;
-        }
-      } catch (error) {
-        console.error('Error updating trainee:', error);
-      } finally {
-        this.loading = false;
-      }
-    },
-
-    async deleteTrainee(id) {
-      this.loading = true;
-      try {
-        await api.delete(`/trainees/${id}`);
-        this.trainees = this.trainees.filter(t => t.id !== id);
-        this.totalTrainees -= 1;
-      } catch (error) {
-        console.error('Error deleting trainee:', error);
-      } finally {
-        this.loading = false;
-      }
-    },
-
     async fetchUnassignedTrainees(page) {
       this.loading = true;
       try {

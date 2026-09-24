@@ -18,15 +18,6 @@ export const register = async (userData) => {
   }
 }
 
-export const fetchUserProfile = async (userId) => {
-  try {
-    const response = await api.get(`/users/${userId}`);
-    return response.data;
-  } catch (error) {
-    return Promise.reject(error.response?.data || 'Failed to fetch user profile');
-  }
-}
-
 export const changePasswordApi = async (passwordData) => {
   try {
     const response = await api.post('/user/changePassword', passwordData);

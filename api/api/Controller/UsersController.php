@@ -20,10 +20,10 @@ class UsersController {
             $username = trim($params['data']['username'] ?? '');
             $email    = trim($params['data']['email'] ?? '');
             $password = $params['data']['password'] ?? '';
-            // Self-registration is only for trainees and supervisors.
-            // Coordinator and admin accounts are created by an admin.
+            // Trainees and supervisors sign up in the mobile app; OJT coordinators sign up on the website
+            // and stay inactive until an admin verifies them (study, Figure 4.9). Admins can't self-register.
             $role     = (int) ($params['data']['userRole'] ?? Access::TRAINEE);
-            if (!in_array($role, [Access::TRAINEE, Access::SUPERVISOR], true)) {
+            if (!in_array($role, [Access::TRAINEE, Access::SUPERVISOR, Access::COORDINATOR], true)) {
                 return ['success' => false, 'message' => 'Invalid account type.'];
             }
 
@@ -76,10 +76,19 @@ class UsersController {
             $requiredHours = ($role == 1) ? 486 : null;
             $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
 
+            // Trainees give their course and OJT start date; supervisors give their company (study, Figure 4.1).
+            $course    = $role === Access::TRAINEE ? mb_substr(trim((string) ($params['data']['course'] ?? '')), 0, 255) : '';
+            $company   = $role === Access::SUPERVISOR ? mb_substr(trim((string) ($params['data']['company'] ?? '')), 0, 255) : '';
+            $startedAt = null;
+            if ($role === Access::TRAINEE && !empty($params['data']['started_at'])) {
+                $ts = strtotime((string) $params['data']['started_at']);
+                $startedAt = $ts ? date('Y-m-d H:i:s', $ts) : null;
+            }
+
             // No token yet: one is issued at first login.
             $stmt = $this->conn->prepare(
-                "INSERT INTO users (username, email, password, role, ojt_required_hours, created_ip)
-                 VALUES (:username, :email, :password, :role, :requiredHours, :created_ip)"
+                "INSERT INTO users (username, email, password, role, ojt_required_hours, course, company, started_at, created_ip)
+                 VALUES (:username, :email, :password, :role, :requiredHours, :course, :company, :started_at, :created_ip)"
             );
             $stmt->execute([
                 'username'      => $username,
@@ -87,10 +96,21 @@ class UsersController {
                 'password'      => $hashedPassword,
                 'role'          => $role,
                 'requiredHours' => $requiredHours,
+                'course'        => $course !== '' ? $course : null,
+                'company'       => $company !== '' ? $company : null,
+                'started_at'    => $startedAt,
                 'created_ip'    => $ip,
             ]);
 
             if ($stmt->rowCount() > 0) {
+                if ($role === Access::COORDINATOR) {
+                    $this->conn->prepare("UPDATE users SET status = 0 WHERE id = :id")
+                        ->execute(['id' => $this->conn->lastInsertId()]);
+                    return [
+                        'success' => true,
+                        'message' => 'Account created. An admin must verify it before you can log in.'
+                    ];
+                }
                 return [
                     'success' => true,
                     'message' => 'User registered successfully.'
@@ -179,8 +199,14 @@ class UsersController {
 
             if ($user && password_verify($password, $user['password'])) {
                 // Staff accounts sign in on the web dashboard, which always sends a captcha.
-                if (in_array((int) $user['role'], Access::STAFF, true) && !$this->verifyCaptcha($captcha_token)) {
-                    return ['success' => false, 'message' => 'Captcha verification failed.'];
+                if (in_array((int) $user['role'], Access::STAFF, true)) {
+                    if (!$this->verifyCaptcha($captcha_token)) {
+                        return ['success' => false, 'message' => 'Captcha verification failed.'];
+                    }
+                    // Coordinators must be verified by an admin first.
+                    if ((int) $user['status'] !== 1) {
+                        return ['success' => false, 'message' => 'Account inactive: please wait for an admin to verify your account.'];
+                    }
                 }
 
                 RateLimiter::clear($accountKey);
@@ -279,10 +305,27 @@ class UsersController {
      */
     public function generateQRCode() {
         try {
-            
             $userId = AuthHelper::validateToken()['id'];
-            
-            $token = bin2hex(random_bytes(4));
+
+            // A QR code needs an emailed OTP verified in the last 10 minutes (study: QR code with OTP
+            // verification). Each verified OTP can be used for one QR code only.
+            $otpStmt = $this->conn->prepare(
+                "SELECT id FROM trainee_otps
+                 WHERE trainee_id = :uid AND is_used = 1 AND expires_at > (NOW() - INTERVAL 10 MINUTE)
+                 ORDER BY id DESC LIMIT 1"
+            );
+            $otpStmt->execute(['uid' => $userId]);
+            $otpId = $otpStmt->fetchColumn();
+            if (!$otpId) {
+                return [
+                    'status'  => 'error',
+                    'message' => 'Please verify the OTP sent to your email first.',
+                    'qr'      => null
+                ];
+            }
+            $this->conn->prepare("UPDATE trainee_otps SET is_used = 2 WHERE id = :id")->execute(['id' => $otpId]);
+
+            $token = bin2hex(random_bytes(16));
             $expiresAt = date('Y-m-d H:i:s', strtotime('+40 minutes'));
             $now = date('Y-m-d H:i:s');
             $today = date('Y-m-d');
@@ -495,14 +538,15 @@ class UsersController {
                 return ['success' => false, 'message' => 'QR code is required.'];
             }
     
+            // Only unused codes that haven't expired (codes are valid for 40 minutes).
             $stmt = $this->conn->prepare(
-                "SELECT * FROM qr_codes WHERE qr_code = :qrCode AND is_used = 0"
+                "SELECT * FROM qr_codes WHERE qr_code = :qrCode AND is_used = 0 AND expires_at > NOW()"
             );
             $stmt->execute(['qrCode' => $qrCode]);
             $existingQr = $stmt->fetch(PDO::FETCH_ASSOC);
     
             if (!$existingQr) {
-                return ['success' => false, 'message' => 'Invalid or already used QR code.'];
+                return ['success' => false, 'message' => 'Invalid, expired, or already used QR code.'];
             }
     
             $traineeId = $existingQr['user_id'];
@@ -2099,6 +2143,25 @@ class UsersController {
                 ];
             }
     
+            // The rated supervisor must be the trainee's own, and each trainee submits once.
+            $check = $this->conn->prepare(
+                "SELECT 1 FROM supervisor_trainees WHERE trainee_id = :tid AND supervisor_id = :sid LIMIT 1"
+            );
+            $check->execute(['tid' => $studentId, 'sid' => $supervisorId]);
+            if (!$check->fetchColumn()) {
+                return ['success' => false, 'message' => 'You can only rate your own supervisor.'];
+            }
+            $check = $this->conn->prepare("SELECT 1 FROM ojt_completions WHERE trainee_id = :tid LIMIT 1");
+            $check->execute(['tid' => $studentId]);
+            if ($check->fetchColumn()) {
+                return ['success' => false, 'message' => 'You have already submitted your OJT completion.'];
+            }
+            $rate = fn ($v) => max(0, min(5, round((float) $v * 2) / 2)); // 0-5 in half stars
+            $supervisorRating = $rate($supervisorRating);
+            $workExpRating    = $rate($workExpRating);
+            $learningRating   = $rate($learningRating);
+            $envRating        = $rate($envRating);
+
             $sql = "INSERT INTO ojt_completions 
                     (trainee_id, supervisor_id, supervisor_rating, 
                      work_experience_rating, learning_experience_rating, 

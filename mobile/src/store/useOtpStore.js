@@ -13,7 +13,6 @@ import {
         set({ loading: true, error: null });
         try {
             const response = await generateOtp(data);
-            console.log("OTP Generation Responses:", response);
             set({ loading: false });
             return response;
         } catch (error) {

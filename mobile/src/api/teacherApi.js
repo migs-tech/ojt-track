@@ -19,27 +19,9 @@ export const fetchNoAttendanceRecords = async () => {
   }
 };
 
-export const fetchAttendanceRecordToday = async () => {
-  try {
-    const response = await api.get(`/attendance/record/today`);
-    return response.data;
-  } catch (error) {
-    return Promise.reject(error);
-  }
-};
-
 export const fetchTraineeList = async () => {
   try {
     const response = await api.post(`/user/getTrainee`);
-    return response.data;
-  } catch (error) {
-    return Promise.reject(error);
-  }
-};
-
-export const getAttendanceRecord = async (studentId) => {
-  try {
-    const response = await api.post(`/attendance/record/${studentId}`);
     return response.data;
   } catch (error) {
     return Promise.reject(error);

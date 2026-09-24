@@ -35,7 +35,6 @@ class Access {
             'report'                  => [self::TRAINEE],
             'sendSupervisorRequest'   => [self::TRAINEE],
             'fetchSupervisor'         => 'auth',
-            'fetchRequestsSupervisors'=> 'auth',
             'AIAssistant'             => [self::TRAINEE],
             'generateOtp'             => 'auth',
             'verifyOtp'               => 'auth',
@@ -46,27 +45,22 @@ class Access {
             'getRequestHistory'       => 'auth',
 
             'scanQrCode'              => [self::SUPERVISOR],
-            'getSupervisorRequests'   => [self::SUPERVISOR],
+            'getSupervisorRequests'   => [self::TRAINEE],   // the trainee's own requests (home screen)
             'getTrainee'              => [self::SUPERVISOR],
             'fetchAllAttendance'      => [self::SUPERVISOR],
             'noAttendance'            => [self::SUPERVISOR],
             'recordAttendance'        => [self::SUPERVISOR],
             'getTotalAttendanceToday' => [self::SUPERVISOR],
 
-            'getAttendance'           => 'auth',
-            'getTotalHours'           => 'auth',
             'saveDeviceToken'         => 'auth',
             'getReports'              => 'auth',
             'getNotifications'        => 'auth',
-            'markNotificationRead'    => 'auth',
             'changePassword'          => 'auth',
             'updateUserProfile'       => 'auth',
             'getUserProfile'          => 'auth',
             'sendVerificationEmail'   => 'auth',
             'checkIfEmailIsVerified'  => 'auth',
 
-            'exportUsersToExcel'      => self::STAFF,
-            'exportUserHoursToExcel'  => self::STAFF,
         ],
         'trainee' => [
             'getTraineeDataById'      => 'auth',   // ownership checked in controller
@@ -88,31 +82,21 @@ class Access {
         'notification' => [
             'deleteNotification'      => 'auth',
             'markNotificationRead'    => 'auth',
-            'getNotifications'        => 'auth',
         ],
         'dashboard' => [
-            'getTotalTrainees'        => self::STAFF,
-            'getTotalSupervisors'     => self::STAFF,
-            'getTotalUsers'           => self::STAFF,
-            'getTraineeByDepartment'  => self::STAFF,
-            'getTraineeByMonth'       => self::STAFF,
             'getDashboardData'        => self::STAFF,
             'getAttendanceByMonth'    => self::STAFF,
         ],
         'admin' => [
             'getTraineeList'          => self::STAFF,
             'getSupervisorList'       => self::STAFF,
-            'getTraineeRequestList'   => self::STAFF,
             'getTraineeNoSupervisor'  => self::STAFF,
             'assignSupervisor'        => self::STAFF,
             'getTraineeDataById'      => self::STAFF,
-            'generateTraineeMonthlyHoursReport'       => self::STAFF,
-            'generateTraineeWeeklyAccomplishmentReport' => self::STAFF,
             'getReportRequest'        => self::STAFF,
             'updateReportRequestStatus' => self::STAFF,
             'getRecentEvaluations'    => self::STAFF,
             'getOjtHoursCompletionStats' => self::STAFF,
-            'getEvaluationsTrainee'   => self::STAFF,
             'getAllEvaluations'       => self::STAFF,
             'getCompletedOjtTrainees' => self::STAFF,
             'generateTraineeDetails'  => self::STAFF,
@@ -122,11 +106,7 @@ class Access {
             'addTeacherAccount'       => [self::ADMIN],
             'updateTeacherAccount'    => self::STAFF, // coordinators may only edit themselves (checked in controller)
         ],
-        'report' => [
-            'generateWeeklyReports'          => self::STAFF,
-            'generateWeeklyReportsAndHours'  => self::STAFF,
-            'generateTraineeMonthlyHoursReport' => self::STAFF,
-        ],
+        // 'report' (GenerateReportController) is used internally by admin actions and scheduled jobs only.
         'cron' => [
             'runAutoTimeOut'                  => 'cron',
             'runDailyAttendanceChecker'       => 'cron',
@@ -145,7 +125,12 @@ class Access {
     /** Returns the rule for a route, or null if the route is not exposed. */
     public static function rule(string $controller, ?string $method) {
         if ($method === null || $method === '') return null;
-        return self::$rules[$controller][$method] ?? null;
+        // PHP method names are case-insensitive (the app calls attendance/timeout for timeOut),
+        // so route names are matched the same way.
+        foreach (self::$rules[$controller] ?? [] as $name => $rule) {
+            if (strcasecmp($name, $method) === 0) return $rule;
+        }
+        return null;
     }
 
     /** Stops the request unless the caller satisfies the route's rule. */

@@ -441,7 +441,7 @@ class AdminController{
             'subject'  => $subject,
             'body'     => $body,
             'files'    => $monthlyHours['filePath'],
-            'fileName' => $monthlyHours['fileName']
+            'fileNames' => $monthlyHours['fileName']
         ]);
 
         logs([
@@ -460,11 +460,14 @@ class AdminController{
             );
         }
 
+        // The report exists even if the email fails; approval should not depend on email delivery.
         return [
-            'success' => $sendMail['success'],
-            'message' => $sendMail['success'] 
-                ? "Report generated and emailed to {$user['email']}" 
-                : "Report generated but failed to send email",
+            'success' => true,
+            'emailed' => (bool) $sendMail['success'],
+            'message' => $sendMail['success']
+                ? "Report generated and emailed to {$user['email']}"
+                : "Report generated, but the email could not be sent",
+            'url'     => $monthlyHours['url'] ?? null,
             'file'    => $monthlyHours['filePath']
         ];
     }
@@ -525,7 +528,7 @@ class AdminController{
                 'subject'  => $subject,
                 'body'     => $body,
                 'files'    => $weeklyReport['filePath'],
-                'fileName' => $weeklyReport['fileName']
+                'fileNames' => $weeklyReport['fileName']
             ]);
 
             logs([
@@ -544,13 +547,16 @@ class AdminController{
                 );
             }
 
-            return [
-                'success' => $sendMail['success'],
-                'message' => $sendMail['success'] 
-                    ? "Report generated and emailed to {$user['email']}" 
-                    : "Report generated but failed to send email",
-                'file'    => $weeklyReport['filePath']
-            ];
+            // The report exists even if the email fails; approval should not depend on email delivery.
+        return [
+            'success' => true,
+            'emailed' => (bool) $sendMail['success'],
+            'message' => $sendMail['success']
+                ? "Report generated and emailed to {$user['email']}"
+                : "Report generated, but the email could not be sent",
+            'url'     => $weeklyReport['url'] ?? null,
+            'file'    => $weeklyReport['filePath']
+        ];
         } catch (PDOException $e) {
             return ['success' => false, 'message' => safeError($e)];
         } catch (Exception $e) {
@@ -728,10 +734,14 @@ class AdminController{
                     "Your report request (ID: {$requestId}) has been {$newStatus}.",
                 );
 
-                return ['success' => true, 'message' => "Report request has been {$newStatus}"];
+                $message = "Report request has been {$newStatus}";
+                if ($newStatus === 'approved' && isset($generate['emailed']) && !$generate['emailed']) {
+                    $message .= ", but the email to the trainee could not be sent";
+                }
+                return ['success' => true, 'message' => $message, 'url' => $generate['url'] ?? null];
             }
-
-            return ['success' => false, 'message' => 'Failed to generate report for approval'];
+            // e.g. "No reports found for this period"
+            return ['success' => false, 'message' => $generate['message'] ?? 'Failed to generate report for approval'];
         } catch (PDOException $e) {
             return ['success' => false, 'message' => safeError($e)];
         } catch (Exception $e) {
@@ -867,6 +877,13 @@ class AdminController{
             }
 
             //save avatar file if provided
+            // Usernames are unique across all accounts (trainees, supervisors and staff).
+            $checkStmt = $this->conn->prepare("SELECT id FROM users WHERE username = :username OR email = :email");
+            $checkStmt->execute(['username' => $username, 'email' => $username]);
+            if ($checkStmt->fetch(PDO::FETCH_ASSOC)) {
+                return ['success' => false, 'message' => 'Username or email already exists'];
+            }
+
             if (isset($params['files']['avatar'])) {
                 try {
                     $avatarUrl = Upload::store($params['files']['avatar'], 'profile_images')['url'];
@@ -875,14 +892,6 @@ class AdminController{
                 }
             } else {
                 $avatarUrl = null; // No avatar provided
-            }
-
-            // Check if username or email already exists
-            $checkSql = "SELECT id FROM users WHERE username = :username  AND role = 3";
-            $checkStmt = $this->conn->prepare($checkSql);
-            $checkStmt->execute(['username' => $username]);
-            if ($checkStmt->fetch(PDO::FETCH_ASSOC)) {
-                return ['success' => false, 'message' => 'Username or email already exists'];
             }
 
             // Hash password
@@ -924,8 +933,11 @@ class AdminController{
                 return ['success' => false, 'message' => 'You can only edit your own account.'];
             }
 
+            // Staff may edit their own profile (header "Edit Profile"); admins may also edit coordinators.
+            $roleFilter = ((int) $teacherId === (int) AuthHelper::id()) ? "role IN (3, 4)" : "role = 3";
+
             // Check if teacher exists
-            $checkSql = "SELECT id, avatar_url FROM users WHERE id = :teacher_id AND role = 3";
+            $checkSql = "SELECT id, avatar_url FROM users WHERE id = :teacher_id AND $roleFilter";
             $checkStmt = $this->conn->prepare($checkSql);
             $checkStmt->execute(['teacher_id' => $teacherId]);
             $teacher = $checkStmt->fetch(PDO::FETCH_ASSOC);
@@ -968,7 +980,7 @@ class AdminController{
             }
 
             $updateFields['teacher_id'] = $teacherId;
-            $updateSql = "UPDATE users SET " . implode(', ', $updateSqlParts) . " WHERE id = :teacher_id AND role = 3";
+            $updateSql = "UPDATE users SET " . implode(', ', $updateSqlParts) . " WHERE id = :teacher_id AND $roleFilter";
             $stmt = $this->conn->prepare($updateSql);
             $stmt->execute($updateFields);
 
@@ -1102,44 +1114,6 @@ class AdminController{
 
         usort($rows, fn ($a, $b) => strcmp((string) $b['evaluated_at'], (string) $a['evaluated_at']));
         return ['status' => 'success', 'data' => $rows];
-    }
-
-    /**
-     * Evaluations from the mobile app's evaluation form, grouped per trainee:
-     * evaluations[section][item] = {points, remarks}. Sections: 1 Leadership, 2 Attitude, 3 Performance.
-     */
-    public function getEvaluationsTrainee($params = []) {
-        $stmt = $this->conn->prepare(
-            "SELECT e.trainee_id, e.supervisor_id, e.evaluation_id, e.item_id, e.points, e.remarks, e.created_at,
-                    COALESCE(NULLIF(t.complete_name, ''), t.username) AS trainee_name,
-                    COALESCE(NULLIF(s.complete_name, ''), s.username) AS supervisor_name
-             FROM trainee_evaluationsV2 e
-             JOIN users t ON t.id = e.trainee_id
-             JOIN users s ON s.id = e.supervisor_id
-             ORDER BY e.created_at DESC, e.item_id"
-        );
-        $stmt->execute();
-
-        $grouped = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $key = $row['trainee_id'] . '-' . $row['supervisor_id'];
-            if (!isset($grouped[$key])) {
-                $grouped[$key] = [
-                    'trainee_id' => (int) $row['trainee_id'],
-                    'trainee_name' => $row['trainee_name'],
-                    'supervisor_id' => (int) $row['supervisor_id'],
-                    'supervisor_name' => $row['supervisor_name'],
-                    'evaluated_at' => $row['created_at'],
-                    'evaluations' => [],
-                ];
-            }
-            $grouped[$key]['evaluations'][$row['evaluation_id']][$row['item_id']] = [
-                'points' => (int) $row['points'],
-                'remarks' => $row['remarks'],
-            ];
-        }
-
-        return ['success' => true, 'data' => array_values($grouped)];
     }
 
     /** Latest evaluations for the dashboard, with the score as a percentage. */

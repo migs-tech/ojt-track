@@ -306,7 +306,6 @@ onMounted(async () => {
 // reCAPTCHA callback when solved
 const onVerify = (response) => {
     token.value = response;
-    console.log("✅ reCAPTCHA Token:", token.value);
 };
 
 // Handle Login
@@ -329,7 +328,6 @@ const handleLogin = async () => {
     if (result.success) {
         const storedUser = localStorage.getItem("user");
         const parsedUser = storedUser ? JSON.parse(storedUser) : {};
-        console.log("Parsed User from Local Storage:", parsedUser);
 
         const userRole = authStore.user.role ?? parsedUser.role ?? null;
         if (userRole == 3) {
@@ -339,7 +337,7 @@ const handleLogin = async () => {
         router.push("app/");
     } else {
         errorMessage.value = result.message || "Invalid username or password.";
-        if (!isDemo) grecaptcha.reset(widgetId);
+        if (!isDemo && widgetId !== null && window.grecaptcha) grecaptcha.reset(widgetId);
     }
 };
 

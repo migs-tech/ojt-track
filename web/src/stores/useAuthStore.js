@@ -48,7 +48,11 @@ export const useAuthStore = defineStore("auth", {
       this.loading = true;
       try {
         const response = await api.post("/user/login", credentials);
-        console.log("Login response:", response.data);
+
+        // The server refuses with a reason, e.g. wrong captcha or account awaiting admin verification.
+        if (!response.data?.success || !response.data?.user) {
+          return { success: false, message: response.data?.message || "Login failed" };
+        }
 
         // Check role and status
         if ([1, 2].includes(response.data.user.role)) {
@@ -78,7 +82,13 @@ export const useAuthStore = defineStore("auth", {
       }
     },
 
-    logout() {
+    async logout() {
+      // Revoke the token on the server too, so it can't be reused.
+      try {
+        await api.post("/user/logout");
+      } catch (e) {
+        // Already expired or offline: clearing the local session is enough.
+      }
       this.user = null;
       this.token = null;
       localStorage.removeItem("user");

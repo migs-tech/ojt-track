@@ -36,6 +36,9 @@ class Database {
                 $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = true;
             }
             $this->conn = new PDO($dsn, $this->username, $this->password, $options);
+            // PHP works in Philippine time (initialize.php). Hosted databases such as TiDB default to UTC,
+            // so align the session; otherwise NOW()-based checks (OTP/QR expiry, "today") are 8 hours off.
+            $this->conn->exec("SET time_zone = '" . (new DateTime())->format('P') . "'");
             $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         } catch (PDOException $e) {
             error_log('[db] Connection failed: ' . $e->getMessage());

@@ -71,7 +71,6 @@ const verified = ref(false);
 // Extract token from URL
 const urlParams = new URLSearchParams(window.location.search);
 const token = urlParams.get("token");
-console.log("Token:", token);
 
 onMounted(async () => {
   try {

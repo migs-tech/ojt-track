@@ -305,7 +305,7 @@ const register = async () => {
     success.value = result.message;
     setTimeout(() => {
       router.push("/login");
-    }, 2000);
+    }, 4000); // time to read "an admin must verify your account"
   } else {
     error.value = result.message || "Registration failed.";
   }

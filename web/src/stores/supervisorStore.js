@@ -27,45 +27,5 @@ export const useSupervisorStore = defineStore('supervisorStore', {
       }
     },
 
-    async addSupervisor(supervisorData) {
-      this.loading = true;
-      try {
-        const response = await api.post('/admin/supervisors', supervisorData);
-        this.supervisors.push(response.data);
-        this.totalSupervisors += 1;
-      } catch (error) {
-        console.error('Error adding supervisor:', error);
-      } finally {
-        this.loading = false;
-      }
-    },
-
-    async updateSupervisor(id, supervisorData) {
-      this.loading = true;
-      try {
-        const response = await api.put(`/supervisors/${id}`, supervisorData);
-        const index = this.supervisors.findIndex(s => s.supervisor_id === id);
-        if (index !== -1) {
-          this.supervisors[index] = response.data;
-        }
-      } catch (error) {
-        console.error('Error updating supervisor:', error);
-      } finally {
-        this.loading = false;
-      }
-    },
-
-    async deleteSupervisor(id) {
-      this.loading = true;
-      try {
-        await api.delete(`/supervisors/${id}`);
-        this.supervisors = this.supervisors.filter(s => s.supervisor_id !== id);
-        this.totalSupervisors -= 1;
-      } catch (error) {
-        console.error('Error deleting supervisor:', error);
-      } finally {
-        this.loading = false;
-      }
-    },
   },
 });

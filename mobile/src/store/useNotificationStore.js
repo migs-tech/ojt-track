@@ -136,7 +136,6 @@ async function saveDeviceToken(token, platform, model) {
     const user = userStr ? JSON.parse(userStr) : null;
     const userId = user ? user.id : null;
 
-    console.log("device token:", token, platform, model, userId);
 
     const response = await api.post('/user/saveDeviceToken', {
       token,

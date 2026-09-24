@@ -141,7 +141,6 @@ useEffect(() => {
 
     setTyping(true);
     //token
-    console.log("Token:", token);
 
     try {
       const { data } = await api.post("/user/AIAssistant", { prompt: input }, {

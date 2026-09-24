@@ -13,7 +13,7 @@ import {
   verifyOtpApi,
   resetPasswordApi
 } from '@/api/authApi';
-import { setTokenProvider } from '@/lib/api';
+import api, { setTokenProvider } from '@/lib/api';
 
 export const useAuth = create((set) => ({
   user: null,
@@ -56,6 +56,12 @@ export const useAuth = create((set) => ({
   },
 
   logout: async () => {
+    // Revoke the token on the server too, so it can't be reused.
+    try {
+      await api.post('/user/logout');
+    } catch (e) {
+      // Already expired or offline: clearing the local session is enough.
+    }
     await SecureStore.deleteItemAsync('accessToken');
     await SecureStore.deleteItemAsync('user');
     set({ token: null, user: null, role: null, loading: false });

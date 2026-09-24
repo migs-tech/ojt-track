@@ -107,7 +107,6 @@ export default function HomeIndex() {
     };
     try {
       const res = await generateOtp(otpData);
-      console.log("OTP Generation Response:", res);
       if (res.success) {
         showSuccess();
       } else {

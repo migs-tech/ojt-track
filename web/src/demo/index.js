@@ -42,6 +42,7 @@ const ok = (message) => ({ success: true, message });
 
 const routes = {
   "user/login": () => ({ user: db.demoUser, token: "demo-token" }),
+  "user/logout": () => ({ success: true }),
   "user/register": () => ({
     success: false,
     message: "Registration is turned off in the demo. Use the demo account to sign in.",
@@ -151,7 +152,6 @@ const routes = {
     return ok("Teacher verified.");
   },
 
-  "admin/getEvaluationsTrainee": () => ({ success: true, data: db.evaluations }),
   "admin/getAllEvaluations": (b) => {
     // Same shape as the API: Midterm/Final rows with 4 criteria (max 20 points).
     const labels = ["Personality", "Punctuality", "Courtesy", "Attitude towards Work"];

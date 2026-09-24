@@ -56,8 +56,8 @@ export default {
   const authStore = useAuthStore();
   const userRole = authStore.user.role;
 
-  const handleLogout = () => {
-    authStore.logout("user");
+  const handleLogout = async () => {
+    await authStore.logout();
     location.reload();
   };
 

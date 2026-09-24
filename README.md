@@ -65,10 +65,11 @@ On a server, leave out `config.php` and set environment variables instead. See `
 ## Security
 
 - Every API endpoint is listed in `api/api/helpers/Access.php` with the login and role it requires. Endpoints that aren't listed are blocked.
-- Sign-up only creates trainee or supervisor accounts. Coordinators are created by an admin, and admins with `tools/create_admin.php`.
+- Trainees and supervisors sign up in the app. Coordinators sign up on the website and stay inactive until an admin verifies them, which the server enforces. Nobody can sign up as an admin; admins are made with `tools/create_admin.php` or in the database.
 - Uploads are checked by their actual file contents, saved under random names, and the uploads folder never runs scripts.
 - Login, reset codes, sign-ups and the AI assistant have attempt limits that are stored in the database.
 - Password reset needs the emailed code, which returns a one-time reset token. Login tokens expire, and logout revokes them.
+- QR attendance needs a freshly verified emailed OTP. QR codes are single-use and expire after 40 minutes.
 - Scheduled jobs (`cron/...`) require the `CRON_SECRET`.
 
 ### 3. Web
