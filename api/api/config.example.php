@@ -34,7 +34,7 @@ if (!defined('OPENAI_API_KEY')) {
 // Public URL of this API, without a trailing slash
 if (!defined('BASE_URL')) define('BASE_URL', 'http://localhost:8080');
 // Web apps allowed to call the API from a browser, comma-separated
-define('ALLOWED_ORIGINS', 'http://localhost:5173');
+define('ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:5174');
 // Secret for scheduled jobs (header X-Cron-Secret or ?key=). Use a long random string.
 define('CRON_SECRET', '');
 // How long a login stays valid
