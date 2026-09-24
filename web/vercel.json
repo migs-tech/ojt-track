@@ -1,9 +1,15 @@
 {
   "redirects": [
+    { "source": "/download", "destination": "/ojt-track.apk", "permanent": false }
+  ],
+  "headers": [
     {
-      "source": "/download",
-      "destination": "https://github.com/migs-tech/ojt-track/releases/latest/download/ojt-track.apk",
-      "permanent": false
+      "source": "/ojt-track.apk",
+      "headers": [
+        { "key": "Content-Type", "value": "application/vnd.android.package-archive" },
+        { "key": "Content-Disposition", "value": "attachment; filename=\"ojt-track.apk\"" },
+        { "key": "Cache-Control", "value": "public, max-age=3600" }
+      ]
     }
   ],
   "rewrites": [

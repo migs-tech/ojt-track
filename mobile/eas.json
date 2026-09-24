@@ -24,7 +24,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://ojt-track-api-5vts.onrender.com/api",
-        "EXPO_PUBLIC_WEB_URL": "https://ojt-track-tau.vercel.app"
+        "EXPO_PUBLIC_WEB_URL": "https://ojt-track-tau.vercel.app",
+        "ORG_GRADLE_PROJECT_reactNativeArchitectures": "armeabi-v7a,arm64-v8a"
       }
     },
     "production": {
@@ -34,7 +35,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://ojt-track-api-5vts.onrender.com/api",
-        "EXPO_PUBLIC_WEB_URL": "https://ojt-track-tau.vercel.app"
+        "EXPO_PUBLIC_WEB_URL": "https://ojt-track-tau.vercel.app",
+        "ORG_GRADLE_PROJECT_reactNativeArchitectures": "armeabi-v7a,arm64-v8a"
       }
     }
   },
