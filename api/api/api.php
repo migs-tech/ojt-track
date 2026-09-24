@@ -2,9 +2,17 @@
 
 require_once 'initialize.php';
 
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+// Browsers may only call the API from the web apps listed in ALLOWED_ORIGINS.
+// The mobile app doesn't send an Origin header, so it isn't affected.
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$allowedOrigins = array_filter(array_map('trim', explode(',', defined('ALLOWED_ORIGINS') ? ALLOWED_ORIGINS : '')));
+if ($origin !== '' && in_array($origin, $allowedOrigins, true)) {
+    header('Access-Control-Allow-Origin: ' . $origin);
+    header('Vary: Origin');
+    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+}
+header('X-Content-Type-Options: nosniff');
 header('Content-Type: application/json; charset=utf-8');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -33,7 +41,7 @@ function validateId($id): bool {
 $basePath = '/api/';
 $requestMethod = $_SERVER['REQUEST_METHOD'];
 $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$path = str_replace($basePath, '', $requestUri);
+$path = strpos($requestUri, $basePath) === 0 ? substr($requestUri, strlen($basePath)) : $requestUri;
 $path = trim($path, '/');
 
 $queryParams = [];
@@ -46,8 +54,6 @@ $segments = explode('/', $path);
 $controllerName = $segments[0] ?? '';
 $methodName = $segments[1] ?? null;
 $id = $segments[2] ?? null;
-
-AuthHelper::id();
 
 $routes = [
     'user' => UsersController::class,
@@ -64,6 +70,8 @@ $routes = [
 if (!array_key_exists($controllerName, $routes)) {
     sendJsonResponse(['error' => 'Resource not found'], 404);
 }
+
+Access::enforce($controllerName, $methodName);
 
 $controllerClass = $routes[$controllerName];
 $controller = new $controllerClass();
@@ -111,8 +119,8 @@ try {
         default:
             sendJsonResponse(['error' => 'Method not supported'], 405);
     }
-} catch (Exception $e) {
-    sendJsonResponse(['error' => $e->getMessage()], 500);
-} catch (Error $e) {
-    sendJsonResponse(['error' => 'Unexpected server error --> ' . $e->getMessage()], 500);
+} catch (Throwable $e) {
+    // Details go to the server log only; clients get a generic message.
+    error_log('[api] ' . $controllerName . '/' . $methodName . ': ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    sendJsonResponse(['error' => 'Server error. Please try again later.'], 500);
 }

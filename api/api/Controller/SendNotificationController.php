@@ -31,7 +31,7 @@ class SendNotificationController {
 
             return ["success" => true, "result" => $result ];
         } catch (Exception $e) {
-            return ["success" => false, "error" => $e->getMessage()];
+            return ["success" => false, "error" => safeError($e)];
         }
     }
     
@@ -52,7 +52,7 @@ class SendNotificationController {
 
             return ["success" => true, "result" => $result ];
         } catch (Exception $e) {
-            return ["success" => false, "error" => $e->getMessage()];
+            return ["success" => false, "error" => safeError($e)];
         }
     }
     
@@ -90,7 +90,7 @@ class SendNotificationController {
         } catch (Exception $e) {
             return json_encode([
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => safeError($e)
             ]);
         }
     }
@@ -100,9 +100,10 @@ class SendNotificationController {
         $notifId= $params['data']['id'];
        
        
+       // Broadcast notifications (user_id IS NULL) are shared, so users can only delete their own.
        $stmt = $this->conn->prepare("
             DELETE FROM notifications 
-            WHERE id = ? AND (user_id = ? OR user_id IS NULL)
+            WHERE id = ? AND user_id = ?
         ");
        
        $success = $stmt->execute([$notifId, $userId]);
@@ -161,12 +162,12 @@ class SendNotificationController {
         } catch (PDOException $e) {
             return [
                 "success" => false,
-                "message" => "Database error: " . $e->getMessage()
+                "message" => safeError($e)
             ];
         } catch (Exception $e) {
             return [
                 "success" => false,
-                "message" => "Unexpected error: " . $e->getMessage()
+                "message" => safeError($e)
             ];
         }
     }

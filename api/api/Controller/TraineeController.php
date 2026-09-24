@@ -8,7 +8,10 @@ class TraineeController {
     }
 
     public function getTraineeDataById($params) {
-        $traineeId = $params['data']['id'];
+        $traineeId = $params['data']['id'] ?? null;
+        if (!AuthHelper::canAccessTrainee($traineeId)) {
+            return ['success' => false, 'message' => 'Trainee not found'];
+        }
         $response = [];
 
         // get trainee details
@@ -124,7 +127,8 @@ class TraineeController {
             $stmt = $this->conn->prepare("SELECT * FROM reports WHERE id = :id");
             $stmt->execute(['id' => $reportId]);
             $report = $stmt->fetch(PDO::FETCH_ASSOC);
-            if (!$report) {
+            // Trainees may only edit their own reports.
+            if (!$report || (int) $report['user_id'] !== (int) AuthHelper::id()) {
                 return ['success' => false, 'message' => 'Report not found'];
             }
     
@@ -147,70 +151,39 @@ class TraineeController {
                 ':id'          => $reportId
             ]);
     
-            // File upload dir
-            $uploadDir = __DIR__ . '/../uploads/reports/';
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0777, true);
-            }
-    
-            // Handle new files upload
+            // Handle new files upload (images only, checked by content)
             $uploadedFiles = [];
-            if ($files && isset($files['name']) && is_array($files['name'])) {
-                foreach ($files['name'] as $index => $name) {
-                    $tmpName = $files['tmp_name'][$index];
-                    $type    = $files['type'][$index];
-                    $size    = $files['size'][$index];
-                    $error   = $files['error'][$index];
-    
-                    if ($error !== UPLOAD_ERR_OK) {
-                        logs("File #$index failed: error=$error");
-                        continue;
-                    }
-    
-                    // Validate size (max 5MB)
-                    if ($size > 5 * 1024 * 1024) {
-                        logs("File too large: $name ($size bytes)");
-                        continue;
-                    }
-    
-                    // Validate mime type (only images)
-                    $allowed = ['image/jpeg', 'image/png', 'image/jpg'];
-                    if (!in_array($type, $allowed)) {
-                        logs("Invalid file type: $type");
-                        continue;
-                    }
-    
-                    // Unique filename
-                    $uniqueName = uniqid() . "_" . basename($name);
-                    $filePath   = $uploadDir . $uniqueName;
-    
-                    if (move_uploaded_file($tmpName, $filePath)) {
-                        $fileUrl = BASE_URL . "/api/uploads/reports/" . $uniqueName;
-    
-                        $stmt = $this->conn->prepare("
-                            INSERT INTO report_files (report_id, file_name, file_url, file_path, file_type, file_size) 
-                            VALUES (?, ?, ?, ?, ?, ?)
-                        ");
-                        $stmt->execute([
-                            $reportId,
-                            $uniqueName,
-                            $fileUrl,
-                            "uploads/reports/" . $uniqueName,
-                            $type,
-                            $size
-                        ]);
-    
-                        $uploadedFiles[] = $fileUrl;
-                    }
+            foreach (Upload::normalize($files ?? []) as $file) {
+                try {
+                    $saved = Upload::store($file, 'reports');
+                } catch (RuntimeException $e) {
+                    logs("Report file skipped: " . $e->getMessage());
+                    continue;
                 }
+
+                $stmt = $this->conn->prepare("
+                    INSERT INTO report_files (report_id, file_name, file_url, file_path, file_type, file_size) 
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $reportId,
+                    $saved['name'],
+                    $saved['url'],
+                    "uploads/reports/" . $saved['name'],
+                    $saved['type'],
+                    $saved['size']
+                ]);
+
+                $uploadedFiles[] = $saved['url'];
             }
     
             // Handle file removals
             foreach ($removeFiles as $fileId) {
                 if (!is_numeric($fileId)) continue;
     
-                $stmt = $this->conn->prepare("SELECT file_path FROM report_files WHERE id = ?");
-                $stmt->execute([$fileId]);
+                // Only files that belong to this report can be removed.
+                $stmt = $this->conn->prepare("SELECT file_path FROM report_files WHERE id = ? AND report_id = ?");
+                $stmt->execute([$fileId, $reportId]);
                 $file = $stmt->fetch(PDO::FETCH_ASSOC);
 
                 $oldFiles = __DIR__ . '/../uploads/reports/' . basename($file['file_path']);
@@ -231,7 +204,7 @@ class TraineeController {
             ];
     
         } catch (Exception $e) {
-            return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         }
     }
 
@@ -267,7 +240,7 @@ class TraineeController {
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
@@ -286,7 +259,8 @@ class TraineeController {
             $stmt->execute(['id' => $requestId]);
             $request = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if (!$request) {
+            // Supervisors may only answer requests sent to them.
+            if (!$request || (int) $request['supervisor_id'] !== (int) AuthHelper::id()) {
                 return ['success' => false, 'message' => 'Request not found'];
             }
 
@@ -346,7 +320,7 @@ class TraineeController {
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
@@ -421,7 +395,7 @@ class TraineeController {
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
@@ -432,6 +406,9 @@ class TraineeController {
 
             if (!$traineeId || !is_numeric($traineeId)) {
                 return ['success' => false, 'message' => 'Invalid trainee ID'];
+            }
+            if (!AuthHelper::canAccessTrainee($traineeId)) {
+                return ['success' => false, 'message' => 'Trainee not found'];
             }
 
             $sql = "
@@ -473,7 +450,7 @@ class TraineeController {
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];  
         }
     }
@@ -489,6 +466,14 @@ class TraineeController {
                 return [
                     'status' => 'error',
                     'message' => 'Missing trainee or supervisor ID.'
+                ];
+            }
+
+            // Supervisors may only evaluate their own trainees.
+            if (!AuthHelper::canAccessTrainee($traineeId)) {
+                return [
+                    'status' => 'error',
+                    'message' => 'You can only evaluate your own trainees.'
                 ];
             }
 
@@ -559,7 +544,7 @@ class TraineeController {
         } catch (Exception $e) {
             return [
                 'status' => 'error',
-                'message' => 'Failed to save evaluation: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }

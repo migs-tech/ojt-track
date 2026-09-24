@@ -28,14 +28,20 @@ class Database {
 
     private function connect() {
         try {
-            $dsn = "mysql:host=$this->host;dbname=$this->db_name";
-            if ($_SERVER['SERVER_NAME'] === 'localhost') {
-                $dsn .= ";port=$this->port";
+            $dsn = "mysql:host=$this->host;port=$this->port;dbname=$this->db_name;charset=utf8mb4";
+            $options = [];
+            // TLS for hosted databases such as TiDB Cloud
+            if (defined('DB_SSL_CA') && DB_SSL_CA !== '') {
+                $options[PDO::MYSQL_ATTR_SSL_CA] = DB_SSL_CA;
+                $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = true;
             }
-            $this->conn = new PDO($dsn, $this->username, $this->password);
+            $this->conn = new PDO($dsn, $this->username, $this->password, $options);
             $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         } catch (PDOException $e) {
-            die('Connection failed: ' . $e->getMessage());
+            error_log('[db] Connection failed: ' . $e->getMessage());
+            http_response_code(503);
+            header('Content-Type: application/json; charset=utf-8');
+            die(json_encode(['error' => 'Service temporarily unavailable.']));
         }
     }
     

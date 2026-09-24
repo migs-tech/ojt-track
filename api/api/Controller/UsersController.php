@@ -20,7 +20,16 @@ class UsersController {
             $username = trim($params['data']['username'] ?? '');
             $email    = trim($params['data']['email'] ?? '');
             $password = $params['data']['password'] ?? '';
-            $role     = $params['data']['userRole'] ?? 1;
+            // Self-registration is only for trainees and supervisors.
+            // Coordinator and admin accounts are created by an admin.
+            $role     = (int) ($params['data']['userRole'] ?? Access::TRAINEE);
+            if (!in_array($role, [Access::TRAINEE, Access::SUPERVISOR], true)) {
+                return ['success' => false, 'message' => 'Invalid account type.'];
+            }
+
+            if (RateLimiter::attempt('register:' . getClientIp(), 10, 3600)) {
+                return ['success' => false, 'message' => 'Too many sign-ups from this network. Please try again later.'];
+            }
 
             if (empty($username) || empty($email) || empty($password)) {
                 return [
@@ -66,18 +75,17 @@ class UsersController {
 
             $requiredHours = ($role == 1) ? 486 : null;
             $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
-            $apiToken = $this->generateApiToken($ip);
 
+            // No token yet: one is issued at first login.
             $stmt = $this->conn->prepare(
-                "INSERT INTO users (username, email, password, role, api_token, ojt_required_hours, created_ip) 
-                 VALUES (:username, :email, :password, :role, :api_token, :requiredHours, :created_ip)"
+                "INSERT INTO users (username, email, password, role, ojt_required_hours, created_ip)
+                 VALUES (:username, :email, :password, :role, :requiredHours, :created_ip)"
             );
             $stmt->execute([
                 'username'      => $username,
                 'email'         => $email,
                 'password'      => $hashedPassword,
                 'role'          => $role,
-                'api_token'     => $apiToken,
                 'requiredHours' => $requiredHours,
                 'created_ip'    => $ip,
             ]);
@@ -96,20 +104,36 @@ class UsersController {
         } catch (PDOException $e) {
             return [
                 'success' => false,
-                'message' => 'Database error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Unexpected error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
     
-    /** Generate a unique API token
+    /**
+     * Verifies a reCAPTCHA token with Google. Returns true if reCAPTCHA isn't configured.
      */
-    private function generateApiToken($ip) {
-        return md5(time() . ip2long($ip) . uniqid());
+    private function verifyCaptcha(?string $token): bool {
+        if (empty($this->RECAPTCHA_SECRET_KEY)) return true;
+        if (empty($token)) return false;
+
+        $context = stream_context_create(['http' => [
+            'method'  => 'POST',
+            'header'  => 'Content-Type: application/x-www-form-urlencoded',
+            'content' => http_build_query([
+                'secret'   => $this->RECAPTCHA_SECRET_KEY,
+                'response' => $token,
+                'remoteip' => getClientIp(),
+            ]),
+            'timeout' => 5,
+        ]]);
+        $response = @file_get_contents('https://www.google.com/recaptcha/api/siteverify', false, $context);
+        $data = $response ? json_decode($response, true) : null;
+        return !empty($data['success']);
     }
 
     /**
@@ -122,45 +146,18 @@ class UsersController {
             $role       = $params['data']['role'] ?? null;
             $captcha_token = $params['data']['captcha_token'] ?? null;
 
-            $secretKey = $this->RECAPTCHA_SECRET_KEY;
-            
-            if(!empty($captcha_token)) {
-                $captchaUrl = 'https://www.google.com/recaptcha/api/siteverify';
-
-                $captchaResponse = file_get_contents($captchaUrl . '?secret=' . $secretKey . '&response=' . $captcha_token);
-                $captchaData = json_decode($captchaResponse, true);
-
-                if (!$captchaData['success']) {
-                    return ['success' => false, 'message' => 'Captcha verification failed.'];
-                }
-            }
-
             if (empty($loginInput) || empty($password)) {
                 return ['success' => false, 'message' => 'Email/Username and password are required.'];
             }
 
+            // Limits are stored in the database, so they can't be skipped by dropping cookies.
             $ip = getClientIp();
-            $maxAttempts = 5;
-            $lockoutMinutes = 5;
-
-            if (!isset($_SESSION['login_attempts'])) {
-                $_SESSION['login_attempts'] = [];
-            }
-            if (!isset($_SESSION['login_attempts'][$ip])) {
-                $_SESSION['login_attempts'][$ip] = [
-                    'count'        => 0,
-                    'last_attempt' => time()
-                ];
-            }
-
-            if (time() - $_SESSION['login_attempts'][$ip]['last_attempt'] > $lockoutMinutes * 60) {
-                $_SESSION['login_attempts'][$ip]['count'] = 0;
-            }
-
-            if ($_SESSION['login_attempts'][$ip]['count'] >= $maxAttempts) {
+            $ipKey      = 'login-ip:' . $ip;
+            $accountKey = 'login-account:' . $loginInput;
+            if (RateLimiter::tooMany($ipKey, 30, 900) || RateLimiter::tooMany($accountKey, 5, 900)) {
                 return [
                     'success' => false,
-                    'message' => 'Too many login attempts. Please try again later in ' . $lockoutMinutes . ' minutes.'
+                    'message' => 'Too many login attempts. Please try again in 15 minutes.'
                 ];
             }
 
@@ -181,7 +178,14 @@ class UsersController {
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($user && password_verify($password, $user['password'])) {
-                $_SESSION['login_attempts'][$ip]['count'] = 0;
+                // Staff accounts sign in on the web dashboard, which always sends a captcha.
+                if (in_array((int) $user['role'], Access::STAFF, true) && !$this->verifyCaptcha($captcha_token)) {
+                    return ['success' => false, 'message' => 'Captcha verification failed.'];
+                }
+
+                RateLimiter::clear($accountKey);
+                $token = AuthHelper::issueToken($user);
+
                 return [
                     'success' => true,
                     'message' => 'Login successful.',
@@ -195,11 +199,11 @@ class UsersController {
                         'email_flg'    => $user['email_flg'] ?? null,
                         'status'       => $user['status'] ?? null,
                     ],
-                    'token'   => $user['api_token']
+                    'token'   => $token
                 ];
             } else {
-                $_SESSION['login_attempts'][$ip]['count'] += 1;
-                $_SESSION['login_attempts'][$ip]['last_attempt'] = time();
+                RateLimiter::hit($ipKey, 900);
+                RateLimiter::hit($accountKey, 900);
                 return [
                     'success' => false,
                     'message' => 'Invalid credentials.',
@@ -209,14 +213,22 @@ class UsersController {
         } catch (PDOException $e) {
             return [
                 'success' => false,
-                'message' => 'Database error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Unexpected error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
+    }
+
+    /**
+     * Logout: invalidates the current token on every device.
+     */
+    public function logout() {
+        AuthHelper::revokeToken((int) AuthHelper::id());
+        return ['success' => true, 'message' => 'Logged out.'];
     }
     
     /**
@@ -252,12 +264,12 @@ class UsersController {
         } catch (PDOException $e) {
             return [
                 'success' => false,
-                'message' => 'Database error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Unexpected error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
@@ -307,13 +319,13 @@ class UsersController {
         } catch (PDOException $e) {
             return [
                 'status' => 'error',
-                'message' => 'Database error: ' . $e->getMessage(),
+                'message' => safeError($e),
                 'qr' => null
             ];
         } catch (Exception $e) {
             return [
                 'status' => 'error',
-                'message' => 'Unexpected error: ' . $e->getMessage(),
+                'message' => safeError($e),
                 'qr' => null
             ];
         }
@@ -356,12 +368,12 @@ class UsersController {
         } catch (PDOException $e) {
             return [
                 'success' => false,
-                'message' => 'Database error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Unexpected error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
@@ -393,23 +405,17 @@ class UsersController {
                 ];
             }
 
-            $filesArr  = $files['files'];
-            $uploadDir = __DIR__ . '/../uploads/reports/';
+            $filesArr  = Upload::normalize($files['files']);
 
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0777, true);
-            }
-
-            $summarize = OpenAIClient::sendReportSummarize([
-                'title'       => $data['title'],
-                'description' => $data['description']
-            ]);
-
-            if (!$summarize){
-                return [
-                    'success' => false,
-                    'message' => 'AI summarization failed.'
-                ];
+            // The AI summary is optional: if it's unavailable, the trainee's own text is saved.
+            $summarize = null;
+            try {
+                $summarize = OpenAIClient::sendReportSummarize([
+                    'title'       => $data['title'],
+                    'description' => $data['description']
+                ]);
+            } catch (Throwable $e) {
+                error_log('[api] report summary skipped: ' . $e->getMessage());
             }
 
             // Save report first
@@ -421,69 +427,59 @@ class UsersController {
                 'user_id'     => $userId,
                 'title'       => $data['title'],
                 'date'        => $data['date'],
-                'description' => $summarize ?? $data['description']
+                'description' => $summarize ?: $data['description']
             ]);
             $reportId = $this->conn->lastInsertId();
 
-            // Handle file uploads
+            // Handle file uploads (images and PDFs only, checked by content)
             $uploadedFiles = [];
-            foreach ($filesArr['name'] as $index => $name) {
-                $tmpName = $filesArr['tmp_name'][$index];
-                $type    = $filesArr['type'][$index];
-                $size    = $filesArr['size'][$index];
-                $error   = $filesArr['error'][$index];
-
-                if ($error !== UPLOAD_ERR_OK) {
-                    error_log("File #$index failed to upload: " . $error);
+            $skipped = [];
+            foreach ($filesArr as $index => $file) {
+                try {
+                    $saved = Upload::store($file, 'reports', Upload::IMAGE_TYPES + Upload::DOCUMENT_TYPES);
+                } catch (RuntimeException $e) {
+                    $skipped[] = $file['name'] . ': ' . $e->getMessage();
                     continue;
                 }
 
-                $uniqueName = time() . "_" . uniqid() . "_" . basename($name);
-                $filePath   = $uploadDir . $uniqueName;
+                $stmt = $this->conn->prepare(
+                    "INSERT INTO report_files (report_id, file_name, file_url, file_path, file_type, file_size) 
+                     VALUES (?, ?, ?, ?, ?, ?)"
+                );
+                $stmt->execute([
+                    $reportId,
+                    $saved['name'],
+                    $saved['url'],
+                    "uploads/reports/" . $saved['name'],
+                    $saved['type'],
+                    $saved['size']
+                ]);
 
-                if (move_uploaded_file($tmpName, $filePath)) {
-                    $fileUrl = BASE_URL . "/api/uploads/reports/" . $uniqueName;
-
-                    $stmt = $this->conn->prepare(
-                        "INSERT INTO report_files (report_id, file_name, file_url, file_path, file_type, file_size) 
-                         VALUES (?, ?, ?, ?, ?, ?)"
-                    );
-                    $stmt->execute([
-                        $reportId,
-                        $uniqueName,
-                        $fileUrl,
-                        "uploads/reports/" . $uniqueName,
-                        $type,
-                        $size
-                    ]);
-
-                    $uploadedFiles[] = [
-                        'name' => $uniqueName,
-                        'url'  => $fileUrl,
-                        'path' => "uploads/reports/" . $uniqueName,
-                        'type' => $type,
-                        'size' => $size
-                    ];
-                } else {
-                    error_log("File #$index failed to move to uploads directory.");
-                }
+                $uploadedFiles[] = [
+                    'name' => $saved['name'],
+                    'url'  => $saved['url'],
+                    'path' => "uploads/reports/" . $saved['name'],
+                    'type' => $saved['type'],
+                    'size' => $saved['size']
+                ];
             }
 
             return [
                 'success'   => true,
-                'message'   => 'Report saved successfully.',
+                'message'   => $skipped ? 'Report saved, but some files were skipped.' : 'Report saved successfully.',
                 'report_id' => $reportId,
-                'files'     => $uploadedFiles
+                'files'     => $uploadedFiles,
+                'skipped'   => $skipped
             ];
         } catch (PDOException $e) {
             return [
                 'success' => false,
-                'message' => 'Database error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Unexpected error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
@@ -560,9 +556,9 @@ class UsersController {
             ];
     
         } catch (PDOException $e) {
-            return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         } catch (Exception $e) {
-            return ['success' => false, 'message' => 'Unexpected error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         }
     }
 
@@ -584,12 +580,12 @@ class UsersController {
         } catch (PDOException $e) {
             return [
                 'success' => false,
-                'message' => 'Database error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Unexpected error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
@@ -630,12 +626,12 @@ class UsersController {
         } catch (PDOException $e) {
             return [
                 "success" => false,
-                "message" => "Database error: " . $e->getMessage()
+                "message" => safeError($e)
             ];
         } catch (Exception $e) {
             return [
                 "success" => false,
-                "message" => "Unexpected error: " . $e->getMessage()
+                "message" => safeError($e)
             ];
         }
     }
@@ -662,12 +658,12 @@ class UsersController {
         } catch (PDOException $e) {
             return [
                 'success' => false,
-                'message' => 'Database error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Unexpected error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
@@ -700,12 +696,12 @@ class UsersController {
         } catch (PDOException $e) {
             return [
                 'success' => false,
-                'message' => 'Database error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Unexpected error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
@@ -753,12 +749,12 @@ class UsersController {
         } catch (PDOException $e) {
             return [
                 'success' => false,
-                'message' => 'Database error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Unexpected error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
@@ -813,9 +809,9 @@ class UsersController {
                 return ['success' => false, 'message' => 'Failed to send request.'];
             }
         } catch (PDOException $e) {
-            return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         } catch (Exception $e) {
-            return ['success' => false, 'message' => 'Unexpected error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         }
     }
 
@@ -848,12 +844,12 @@ class UsersController {
         } catch (PDOException $e) {
             return [
                 'success' => false,
-                'message' => 'Database error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Unexpected error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
@@ -912,12 +908,12 @@ class UsersController {
         } catch (PDOException $e) {
             return [
                 'success' => false,
-                'message' => 'Database error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Unexpected error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
@@ -954,13 +950,13 @@ class UsersController {
             return [
                 'success' => false,
                 'trainees' => [],
-                'error'   => 'Database error: ' . $e->getMessage()
+                'error'   => safeError($e)
             ];
         } catch (Exception $e) {
             return [
                 'success' => false,
                 'trainees' => [],
-                'error'   => 'Unexpected error: ' . $e->getMessage()
+                'error'   => safeError($e)
             ];
         }
     }
@@ -1022,12 +1018,12 @@ class UsersController {
         } catch (PDOException $e) {
             return [
                 'success' => false,
-                'message' => 'Database error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Unexpected error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
@@ -1065,12 +1061,12 @@ class UsersController {
         } catch (PDOException $e) {
             return [
                 'success' => false,
-                'error'   => 'Database error: ' . $e->getMessage()
+                'error'   => safeError($e)
             ];
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'error'   => 'Unexpected error: ' . $e->getMessage()
+                'error'   => safeError($e)
             ];
         }
     }
@@ -1080,6 +1076,11 @@ class UsersController {
      */
     public function recordAttendance($params) {
         $traineeId = $params['data']['student_id'] ?? null;
+
+        // Supervisors may only record attendance for their own trainees.
+        if (!AuthHelper::canAccessTrainee($traineeId)) {
+            return ["success" => false, "message" => "You can only record attendance for your own trainees."];
+        }
         $status    = $params['data']['status'] ?? 'absent';
 
         if ($status == "present") {
@@ -1156,7 +1157,7 @@ class UsersController {
                 return ["success" => false, "message" => "Failed to record attendance"];
             }
         } catch (PDOException $e) {
-            return ["success" => false, "message" => "Database Error: " . $e->getMessage()];
+            return ["success" => false, "message" => safeError($e)];
         }
     }
 
@@ -1188,12 +1189,12 @@ class UsersController {
         } catch (PDOException $e) {
             return [
                 'success' => false,
-                'error'   => 'Database error: ' . $e->getMessage()
+                'error'   => safeError($e)
             ];
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'error'   => 'Unexpected error: ' . $e->getMessage()
+                'error'   => safeError($e)
             ];
         }
     }
@@ -1203,7 +1204,11 @@ class UsersController {
     public function generateOtp($params) {
         try {
             $traineeId = AuthHelper::validateToken()['id'];
-            $otp = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+            // This endpoint checks a password, so it's limited like login.
+            if (RateLimiter::attempt('generate-otp:' . $traineeId, 5, 900)) {
+                return ['success' => false, 'error' => 'Too many attempts. Please try again in 15 minutes.'];
+            }
+            $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
             $expiresAt = date("Y-m-d H:i:s", strtotime("+5 minutes"));
 
             $username = trim($params['data']['username'] ?? '');
@@ -1217,7 +1222,7 @@ class UsersController {
             $stmt->execute(['username' => $username]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($user && password_verify($password, $user['password'])) {
+            if ($user && (int) $user['id'] === (int) $traineeId && password_verify($password, $user['password'])) {
                 $stmt = $this->conn->prepare(
                     "INSERT INTO trainee_otps (trainee_id, otp_code, expires_at, is_used) 
                      VALUES (:trainee_id, :otp_code, :expires_at, 0)"
@@ -1263,14 +1268,15 @@ class UsersController {
                     );
                 }
 
-                return ['success' => true, 'otp' => $otp];
+                // The code is delivered by email/notification only, never in the response.
+                return ['success' => true];
             } else {
                 return ['success' => false, 'error' => 'Invalid credentials.'];
             }
         } catch (PDOException $e) {
-            return ['success' => false, 'error' => 'Database error: ' . $e->getMessage()];
+            return ['success' => false, 'error' => safeError($e)];
         } catch (Exception $e) {
-            return ['success' => false, 'error' => 'Unexpected error: ' . $e->getMessage()];
+            return ['success' => false, 'error' => safeError($e)];
         }
     }
 
@@ -1279,6 +1285,10 @@ class UsersController {
     public function verifyOtp($params) {
         $traineeId = AuthHelper::validateToken()['id'];
         $otp = $params['data']['otp'] ?? null;
+
+        if (RateLimiter::attempt('verify-otp:' . $traineeId, 5, 900)) {
+            return ['success' => false, 'message' => 'Too many attempts. Please request a new code.'];
+        }
 
         $stmt = $this->conn->prepare(
             "SELECT * FROM trainee_otps
@@ -1467,12 +1477,12 @@ class UsersController {
         } catch (PDOException $e) {
             return [
                 "success" => false,
-                "message" => "Database error: " . $e->getMessage()
+                "message" => safeError($e)
             ];
         } catch (Exception $e) {
             return [
                 "success" => false,
-                "message" => "Unexpected error: " . $e->getMessage()
+                "message" => safeError($e)
             ];
         }
     }
@@ -1480,7 +1490,7 @@ class UsersController {
     /** Mark a notification as read
       */
    public function markNotificationRead($params){
-       $userId = AuthHelper::validateToken()['id'] ?? 8; 
+       $userId = AuthHelper::id(); 
        $notifId= $params['data']['id'];
        
        
@@ -1565,12 +1575,12 @@ class UsersController {
         } catch (PDOException $e) {
             return [
                 "success" => false,
-                "message" => "Database error: " . $e->getMessage()
+                "message" => safeError($e)
             ];
         } catch (Exception $e) {
             return [
                 "success" => false,
-                "message" => "Unexpected error: " . $e->getMessage()
+                "message" => safeError($e)
             ];
         }
     }
@@ -1621,16 +1631,14 @@ class UsersController {
         $profileImageUrl = null;
 
         if (isset($files['profileImage']) && $files['profileImage']['error'] === 0) {
-            $fileTmpPath = $files['profileImage']['tmp_name'];
-            $fileName    = time() . "_" . uniqid() . "_" . basename($files['profileImage']['name']);
-            $uploadDir   = __DIR__ . '/../uploads/profile_images/';
-
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0777, true);
+            try {
+                $saved = Upload::store($files['profileImage'], 'profile_images');
+            } catch (RuntimeException $e) {
+                return ["success" => false, "message" => $e->getMessage()];
             }
 
-            if (move_uploaded_file($fileTmpPath, $uploadDir . $fileName)) {
-                $profileImageUrl = BASE_URL . '/api/uploads/profile_images/' . $fileName;
+            if ($saved) {
+                $profileImageUrl = $saved['url'];
      
                 // Delete old profile image if exists
                 if (!empty($oldUser['avatar_url'])) {
@@ -1702,29 +1710,40 @@ class UsersController {
      */
     public function forgotPassword($params) {
         $email = filter_var($params['data']['email'] ?? null, FILTER_SANITIZE_EMAIL);
+
         if (!$email) {
             return ['success' => false, 'message' => 'Email is required.'];
         }
+
+        if (RateLimiter::attempt('forgot-ip:' . getClientIp(), 10, 3600)
+            || RateLimiter::attempt('forgot-email:' . $email, 3, 900)) {
+            return ['success' => false, 'message' => 'Too many requests. Please try again later.'];
+        }
+
+        // Same answer whether or not the email exists, so accounts can't be discovered this way.
+        $genericResponse = ['success' => true, 'message' => 'If that email is registered, we sent a code to it.'];
 
         $stmt = $this->conn->prepare("
             SELECT id, COALESCE(NULLIF(complete_name, ''), username) AS name
             FROM users
             WHERE email = :email
         ");
-        
         $stmt->execute(['email' => $email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$user) {
-            return ['success' => false, 'message' => 'No user found with that email.'];
+            return $genericResponse;
         }
 
-       //send otp to email
-        $otp = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+        // Only the newest code is valid.
+        $this->conn->prepare("UPDATE password_resets SET is_used = 1 WHERE user_id = :uid AND is_used = 0")
+            ->execute(['uid' => $user['id']]);
+
+        $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $expiresAt = date("Y-m-d H:i:s", strtotime("+15 minutes"));
 
         $insertStmt = $this->conn->prepare(
-            "INSERT INTO password_resets (user_id, otp_code, expires_at, is_used) 
+            "INSERT INTO password_resets (user_id, otp_code, expires_at, is_used)
              VALUES (:user_id, :otp_code, :expires_at, 0)"
         );
         $insertStmt->execute([
@@ -1732,77 +1751,88 @@ class UsersController {
             ':otp_code'  => $otp,
             ':expires_at'=> $expiresAt
         ]);
-        
-       
 
         $template = EmailTemplate::otpVerification($user['name'], $otp);
-        $to = $email;
-        $subject = "Password Reset OTP";
-        $body = $template['body'];
-
         $mail = MailerController::sendEmail([
-            'to'      => $to,
-            'subject' => $subject,
-            'body'    => $body
+            'to'      => $email,
+            'subject' => "Password Reset OTP",
+            'body'    => $template['body']
         ]);
 
-        if ($mail) {
-            return ['success' => true, 'message' => 'OTP sent to your email.'];
-        } else {
-            return ['success' => false, 'message' => 'Failed to send OTP email.'];
+        if (!$mail) {
+            return ['success' => false, 'message' => 'Failed to send the email. Please try again later.'];
         }
+        return $genericResponse;
     }
 
-    /** Verify OTP for password reset
+    /** Verify OTP for password reset. Returns a one-time reset token that resetPassword requires.
      */
     public function verifyForgotPasswordOtp($params) {
         $email = filter_var($params['data']['email'] ?? null, FILTER_SANITIZE_EMAIL);
-        $otp   = trim($params['data']['otp'] ?? null);
+        $otp   = trim((string) ($params['data']['otp'] ?? ''));
 
-        if (!$email || !$otp) {
+        if (!$email || $otp === '') {
             return ['success' => false, 'message' => 'Email and OTP are required.'];
+        }
+
+        // 5 wrong guesses and the code is burned; the user must request a new one.
+        $limitKey = 'reset-otp:' . $email;
+        if (RateLimiter::tooMany($limitKey, 5, 900)) {
+            return ['success' => false, 'message' => 'Too many attempts. Please request a new code.'];
         }
 
         $stmt = $this->conn->prepare("SELECT id FROM users WHERE email = :email");
         $stmt->execute([':email' => $email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$user) {
-            return ['success' => false, 'message' => 'User not found.'];
+        $reset = false;
+        if ($user) {
+            $stmt = $this->conn->prepare("
+                SELECT * FROM password_resets
+                WHERE user_id = :user_id
+                AND is_used = 0
+                AND expires_at > NOW()
+                ORDER BY id DESC
+                LIMIT 1
+            ");
+            $stmt->execute([':user_id' => $user['id']]);
+            $reset = $stmt->fetch(PDO::FETCH_ASSOC);
         }
 
-        $stmt = $this->conn->prepare("
-            SELECT * FROM password_resets
-            WHERE user_id = :user_id
-            AND otp_code = :otp_code
-            AND is_used = 0
-            AND expires_at > NOW()
-            ORDER BY id DESC
-            LIMIT 1
-        ");
-        $stmt->execute([
-            ':user_id'  => $user['id'],
-            ':otp_code' => $otp
-        ]);
-
-        $reset = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$reset) {
+        if (!$reset || !hash_equals((string) $reset['otp_code'], $otp)) {
+            RateLimiter::hit($limitKey, 900);
+            if ($user && RateLimiter::tooMany($limitKey, 5, 900)) {
+                $this->conn->prepare("UPDATE password_resets SET is_used = 1 WHERE user_id = :uid AND is_used = 0")
+                    ->execute(['uid' => $user['id']]);
+            }
             return ['success' => false, 'message' => 'Invalid or expired OTP.'];
         }
 
-        $updateStmt = $this->conn->prepare("UPDATE password_resets SET is_used = 1 WHERE id = :id");
-        $updateStmt->execute([':id' => $reset['id']]);
+        RateLimiter::clear($limitKey);
+        $resetToken = bin2hex(random_bytes(32));
+        $updateStmt = $this->conn->prepare("
+            UPDATE password_resets
+            SET is_used = 1, reset_token = :token, reset_expires = :expires
+            WHERE id = :id
+        ");
+        $updateStmt->execute([
+            ':token'   => hash('sha256', $resetToken),
+            ':expires' => date('Y-m-d H:i:s', strtotime('+15 minutes')),
+            ':id'      => $reset['id'],
+        ]);
 
-        return ['success' => true, 'message' => 'OTP verified successfully.'];
+        return ['success' => true, 'message' => 'OTP verified successfully.', 'reset_token' => $resetToken];
     }
 
+    /** Sets a new password. Requires the reset token from verifyForgotPasswordOtp.
+     */
     public function resetPassword($params) {
         $email           = filter_var($params['data']['email'] ?? null, FILTER_SANITIZE_EMAIL);
         $newPassword     = $params['data']['password'] ?? null;
         $confirmPassword = $params['data']['confirm_password'] ?? null;
+        $resetToken      = (string) ($params['data']['reset_token'] ?? '');
 
-        if (!$email || !$newPassword || !$confirmPassword) {
+        if (!$email || !$newPassword || !$confirmPassword || $resetToken === '') {
             return ['success' => false, 'message' => 'All fields are required.'];
         }
 
@@ -1810,29 +1840,47 @@ class UsersController {
             return ['success' => false, 'message' => 'Passwords do not match.'];
         }
 
-        $stmt = $this->conn->prepare("SELECT id FROM users WHERE email = :email");
-        $stmt->execute([':email' => $email]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (strlen($newPassword) < 6) {
+            return ['success' => false, 'message' => 'Password must be at least 6 characters long.'];
+        }
 
-        if (!$user) {
-            return ['success' => false, 'message' => 'User not found.'];
+        $stmt = $this->conn->prepare("
+            SELECT pr.id, pr.user_id
+            FROM password_resets pr
+            JOIN users u ON u.id = pr.user_id
+            WHERE u.email = :email
+              AND pr.reset_token = :token
+              AND pr.reset_expires > NOW()
+            LIMIT 1
+        ");
+        $stmt->execute([':email' => $email, ':token' => hash('sha256', $resetToken)]);
+        $reset = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$reset) {
+            return ['success' => false, 'message' => 'This reset request has expired. Please start again.'];
         }
 
         $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+        $this->conn->prepare("UPDATE users SET password = :password WHERE id = :id")
+            ->execute([':password' => $hashedPassword, ':id' => $reset['user_id']]);
 
-        $updateStmt = $this->conn->prepare("UPDATE users SET password = :password WHERE id = :id");
-        $updateStmt->execute([
-            ':password' => $hashedPassword,
-            ':id'       => $user['id']
-        ]);
+        // The reset token works once, and existing sessions are signed out.
+        $this->conn->prepare("UPDATE password_resets SET reset_token = NULL, reset_expires = NULL WHERE id = :id")
+            ->execute([':id' => $reset['id']]);
+        AuthHelper::revokeToken((int) $reset['user_id']);
 
         return ['success' => true, 'message' => 'Password has been reset successfully.'];
     }
-    
+
     /** AI Assistant with rate limiting
      */
     public function AIAssistant($params) {
         $message = $params['data']['message'] ?? '';
+
+        // Each message costs money on the OpenAI account, so cap it per user per day.
+        if (RateLimiter::attempt('ai:' . AuthHelper::id(), 20, 86400)) {
+            return ['reply' => "You've reached today's limit of 20 questions. Please try again tomorrow."];
+        }
         
         $ip = getClientIp();
         $maxAttempts = 5;
@@ -1945,9 +1993,9 @@ class UsersController {
             }
     
         } catch (PDOException $e) {
-            return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         } catch (Exception $e) {
-            return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         }
     }
 
@@ -1993,9 +2041,9 @@ class UsersController {
             return ['success' => true, 'message' => 'Email verified successfully.'];
     
         } catch (PDOException $e) {
-            return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         } catch (Exception $e) {
-            return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         }
     }
 
@@ -2075,7 +2123,7 @@ class UsersController {
         } catch (PDOException $e) {
             return [
                 'success' => false,
-                'message' => 'Database error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
@@ -2118,7 +2166,7 @@ class UsersController {
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
@@ -2191,7 +2239,7 @@ class UsersController {
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
@@ -2282,9 +2330,9 @@ class UsersController {
                 return ['success' => false, 'message' => 'Failed to submit request'];
             }
         } catch (PDOException $e) {
-            return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         } catch (Exception $e) {
-            return ['success' => false, 'message' => 'Unexpected error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         }
     }
 
@@ -2330,9 +2378,9 @@ class UsersController {
                 return ['success' => false, 'message' => 'No requests found'];
             }
         } catch (PDOException $e) {
-            return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         } catch (Exception $e) {
-            return ['success' => false, 'message' => 'Unexpected error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         }
     }
 

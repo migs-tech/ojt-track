@@ -46,15 +46,26 @@ ojt-track/
 ## Getting started
 
 ### 1. Database
-Create a MySQL/MariaDB database called `ojt` and import `database/schema.sql`.
+Create a MySQL/MariaDB database called `ojt`, then import `database/schema.sql` followed by `database/migrations/001_security.sql`.
 
 ### 2. API
 ```bash
 cd api
 composer install
 cp api/config.example.php api/config.php   # then fill in your DB, SMTP, reCAPTCHA and OpenAI keys
+php api/tools/create_admin.php admin you@example.com   # creates the first admin account
+php -S localhost:8080 dev-router.php         # or serve the api/ folder with Apache (e.g. XAMPP)
 ```
-Serve the `api/` folder with PHP/Apache (for example XAMPP).
+On a server, leave out `config.php` and set environment variables instead. See `api/api/config.env.php` for the full list.
+
+## Security
+
+- Every API endpoint is listed in `api/api/helpers/Access.php` with the login and role it requires. Endpoints that aren't listed are blocked.
+- Sign-up only creates trainee or supervisor accounts. Coordinators are created by an admin, and admins with `tools/create_admin.php`.
+- Uploads are checked by their actual file contents, saved under random names, and the uploads folder never runs scripts.
+- Login, reset codes, sign-ups and the AI assistant have attempt limits that are stored in the database.
+- Password reset needs the emailed code, which returns a one-time reset token. Login tokens expire, and logout revokes them.
+- Scheduled jobs (`cron/...`) require the `CRON_SECRET`.
 
 ### 3. Web
 ```bash

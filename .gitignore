@@ -14,6 +14,7 @@ mobile/google-services.json
 !database/schema.sql
 api/api/uploads/*
 !api/api/uploads/.gitkeep
+!api/api/uploads/.htaccess
 
 # Dependencies & builds
 node_modules/

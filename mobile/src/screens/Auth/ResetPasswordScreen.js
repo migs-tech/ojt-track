@@ -172,6 +172,7 @@ const PasswordRequirements = ({ password }) => {
 
 export default function ResetPasswordScreen({ route, navigation }) {
   const email = route?.params?.email || "";
+  const resetToken = route?.params?.resetToken || "";
   const { resetPassword } = useAuth();
 
   const [formData, setFormData] = useState({
@@ -215,6 +216,7 @@ export default function ResetPasswordScreen({ route, navigation }) {
     try {
       const response = await resetPassword({
         email,
+        reset_token: resetToken,
         password: formData.password,
         confirm_password: formData.confirmPassword,
       });

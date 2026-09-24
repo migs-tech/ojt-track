@@ -93,7 +93,7 @@ class MailerController {
 
             return [
                 'success' => false,
-                'message' => "Mailer Error: {$e->getMessage()}"
+                'message' => safeError($e)
             ];
         }
     }

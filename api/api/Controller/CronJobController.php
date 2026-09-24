@@ -226,7 +226,7 @@ class CronJobController {
         } catch (Exception $e) {
             return [
                 'status' => 'error',
-                'message' => 'An error occurred: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
@@ -308,7 +308,7 @@ class CronJobController {
         } catch (Exception $e) {
             return [
                 'status' => 'error',
-                'message' => 'An error occurred: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
@@ -382,7 +382,7 @@ class CronJobController {
             $results[] = [
                 'user_id'   => null,
                 'user_name' => null,
-                'status'    => 'Exception: ' . $e->getMessage(),
+                'status'    => safeError($e),
                 'email'     => 'N/A'
             ];
         }
@@ -473,7 +473,7 @@ class CronJobController {
             $results[] = [
                 'user_id' => null,
                 'user_name' => null,
-                'status' => 'Exception: ' . $e->getMessage()
+                'status' => safeError($e)
             ];
         }
 
@@ -582,7 +582,7 @@ class CronJobController {
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
@@ -685,7 +685,7 @@ class CronJobController {
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
@@ -815,7 +815,7 @@ class CronJobController {
                 'results' => $results
             ];
         } catch (Exception $e) {
-            $errorMsg = 'Exception: ' . $e->getMessage();
+            $errorMsg = safeError($e);
             logs($errorMsg, "cron_debug.log");
             $results[] = [
                 'user_id' => null,

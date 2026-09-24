@@ -146,7 +146,7 @@ class UserAttendanceController {
         } catch (Exception $e) {
             return [
                 "success" => false,
-                "message" => "Error: " . $e->getMessage()
+                "message" => safeError($e)
             ];
         }
     }

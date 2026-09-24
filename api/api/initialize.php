@@ -32,7 +32,12 @@ foreach (glob("Lib/*.php") as $file) {
     }
 }
 
-require_once __DIR__ . '/config.php';
+// Local development uses config.php; servers use environment variables.
+if (file_exists(__DIR__ . '/config.php') && !getenv('OJT_CONFIG_FROM_ENV')) {
+    require_once __DIR__ . '/config.php';
+} else {
+    require_once __DIR__ . '/config.env.php';
+}
 
 if ($_SERVER['SERVER_NAME'] === 'localhost') {
     if (!defined('BASE_URL')) {

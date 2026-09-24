@@ -30,3 +30,14 @@ define('RECAPTCHA_SECRET_KEY', 'your-recaptcha-secret-key');
 if (!defined('OPENAI_API_KEY')) {
     define('OPENAI_API_KEY', 'your-openai-api-key');
 }
+
+// Public URL of this API, without a trailing slash
+if (!defined('BASE_URL')) define('BASE_URL', 'http://localhost:8080');
+// Web apps allowed to call the API from a browser, comma-separated
+define('ALLOWED_ORIGINS', 'http://localhost:5173');
+// Secret for scheduled jobs (header X-Cron-Secret or ?key=). Use a long random string.
+define('CRON_SECRET', '');
+// How long a login stays valid
+define('TOKEN_TTL_DAYS', 30);
+// Path to a CA certificate bundle to use TLS for the database (e.g. TiDB Cloud); empty = off
+define('DB_SSL_CA', '');

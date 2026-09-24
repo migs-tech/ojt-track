@@ -467,9 +467,9 @@ class AdminController{
                 'file'    => $weeklyReport['filePath']
             ];
         } catch (PDOException $e) {
-            return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         } catch (Exception $e) {
-            return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         }
     }
 
@@ -559,7 +559,7 @@ class AdminController{
         } catch (PDOException $e) {
             return [
                 'success' => false,
-                'message' => 'Database error: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }
@@ -648,9 +648,9 @@ class AdminController{
 
             return ['success' => false, 'message' => 'Failed to generate report for approval'];
         } catch (PDOException $e) {
-            return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         } catch (Exception $e) {
-            return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         }
     }
     
@@ -700,9 +700,9 @@ class AdminController{
                 ]
             ];
         } catch (PDOException $e) {
-            return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         } catch (Exception $e) {
-            return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
        }
     }
 
@@ -733,9 +733,9 @@ class AdminController{
 
             return ['success' => true, 'message' => 'Teacher account verified successfully'];
         } catch (PDOException $e) {
-            return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         } catch (Exception $e) {
-            return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         }
     }
 
@@ -764,9 +764,9 @@ class AdminController{
 
             return ['success' => true, 'message' => 'Teacher account deleted successfully'];
         } catch (PDOException $e) {
-            return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         } catch (Exception $e) {
-            return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         }
     }
 
@@ -783,22 +783,11 @@ class AdminController{
 
             //save avatar file if provided
             if (isset($params['files']['avatar'])) {
-                $uploadDir   = __DIR__ . '/../uploads/profile_images/';
-                if (!is_dir($uploadDir)) {
-                    mkdir($uploadDir, 0755, true);
+                try {
+                    $avatarUrl = Upload::store($params['files']['avatar'], 'profile_images')['url'];
+                } catch (RuntimeException $e) {
+                    return ['success' => false, 'message' => $e->getMessage()];
                 }
-                $file = $params['files']['avatar'];
-                $fileExt = pathinfo($file['name'], PATHINFO_EXTENSION);
-                $allowedExts = ['jpg', 'jpeg', 'png', 'gif'];
-                if (!in_array(strtolower($fileExt), $allowedExts)) {
-                    return ['success' => false, 'message' => 'Invalid avatar file type. Allowed types: ' . implode(', ', $allowedExts)];
-                }
-                $newFileName = uniqid('avatar_') . '.' . $fileExt;
-                $filePath = $uploadDir . $newFileName;
-                if (!move_uploaded_file($file['tmp_name'], $filePath)) {
-                    return ['success' => false, 'message' => 'Failed to upload avatar file'];
-                }
-                $avatarUrl = BASE_URL .'/api/uploads/profile_images/' . $newFileName;
             } else {
                 $avatarUrl = null; // No avatar provided
             }
@@ -828,9 +817,9 @@ class AdminController{
 
             return ['success' => true, 'message' => 'Teacher account created successfully'];
         } catch (PDOException $e) {
-            return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         } catch (Exception $e) {
-            return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         }
     }
 
@@ -843,6 +832,11 @@ class AdminController{
 
             if (!$teacherId || !is_numeric($teacherId) || empty($completeName)) {
                 return ['success' => false, 'message' => 'Invalid input data'];
+            }
+
+            // Coordinators may only edit their own account; admins may edit any.
+            if (AuthHelper::role() !== Access::ADMIN && (int) $teacherId !== (int) AuthHelper::id()) {
+                return ['success' => false, 'message' => 'You can only edit your own account.'];
             }
 
             // Check if teacher exists
@@ -868,21 +862,13 @@ class AdminController{
 
             // Handle avatar upload if provided
             if (isset($params['files']['avatar'])) {
+                try {
+                    $saved = Upload::store($params['files']['avatar'], 'profile_images');
+                } catch (RuntimeException $e) {
+                    return ['success' => false, 'message' => $e->getMessage()];
+                }
                 $uploadDir = __DIR__ . '/../uploads/profile_images/';
-                if (!is_dir($uploadDir)) {
-                    mkdir($uploadDir, 0755, true);
-                }
-                $file = $params['files']['avatar'];
-                $fileExt = pathinfo($file['name'], PATHINFO_EXTENSION);
-                $allowedExts = ['jpg', 'jpeg', 'png', 'gif'];
-                if (!in_array(strtolower($fileExt), $allowedExts)) {
-                    return ['success' => false, 'message' => 'Invalid avatar file type. Allowed types: ' . implode(', ', $allowedExts)];
-                }
-                $newFileName = uniqid('avatar_') . '.' . $fileExt;
-                $filePath = $uploadDir . $newFileName;
-                if (!move_uploaded_file($file['tmp_name'], $filePath)) {
-                    return ['success' => false, 'message' => 'Failed to upload avatar file'];
-                }
+                $newFileName = $saved['name'];
 
                 // Optionally delete old avatar file
                 if (!empty($teacher['avatar_url'])) {
@@ -903,9 +889,9 @@ class AdminController{
 
             return ['success' => true, 'message' => 'Teacher account updated successfully'];
         } catch (PDOException $e) {
-            return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         } catch (Exception $e) {
-            return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
+            return ['success' => false, 'message' => safeError($e)];
         }
     }
 
@@ -975,7 +961,7 @@ class AdminController{
         } catch (Exception $e) {
             return [
                 'status' => 'error',
-                'message' => 'Failed to fetch evaluations: ' . $e->getMessage()
+                'message' => safeError($e)
             ];
         }
     }

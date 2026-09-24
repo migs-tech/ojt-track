@@ -55,3 +55,15 @@ function getBrowser(): string {
 
     return 'Unknown';
 }
+
+/**
+ * Logs an exception and returns a message that is safe to show to users.
+ * Database errors, PHP errors and mail errors can reveal server details, so they get a generic message.
+ */
+function safeError(Throwable $e): string {
+    error_log('[api] ' . get_class($e) . ': ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    if ($e instanceof PDOException || $e instanceof Error || stripos(get_class($e), 'PHPMailer') !== false) {
+        return 'Server error. Please try again later.';
+    }
+    return $e->getMessage();
+}

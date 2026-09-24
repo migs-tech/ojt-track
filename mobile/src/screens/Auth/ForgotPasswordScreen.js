@@ -195,7 +195,8 @@ export default function ForgotPasswordScreen({ navigation }) {
 
     if (res.success) {
       setShowOtpModal(false);
-      navigation.navigate("ResetPassword", { email });
+      // The server returns a one-time token that the reset step must send back.
+      navigation.navigate("ResetPassword", { email, resetToken: res.reset_token });
     } else {
       setOtpError(res.message || "Invalid OTP. Please try again.");
     }
