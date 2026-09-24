@@ -499,42 +499,37 @@ class TraineeController {
                 ];
             }
 
-            // Prepare insert
+            // Midterm/Final form from the study: four criteria, each scored 1-5 (max 20).
             $criteria = $data['criteria'] ?? [];
-            $insertQuery = "
+            $scores = [];
+            foreach (['personality', 'punctuality', 'courtesy', 'attitude'] as $key) {
+                $scores[$key] = max(0, min(5, (int) ($criteria[$key] ?? 0)));
+            }
+            if (!in_array($evaluationType, ['Midterm', 'Final'], true)) {
+                return ['status' => 'error', 'message' => 'Evaluation type must be Midterm or Final.'];
+            }
+
+            $stmt = $this->conn->prepare("
                 INSERT INTO trainee_evaluations (
                     trainee_id, supervisor_id, evaluation_type,
-                    attendance_punctuality, work_quality, productivity, initiative, 
-                    communication_skills, teamwork_cooperation, adaptability, 
-                    attitude_conduct, dependability, overall_performance, 
+                    personality, punctuality, courtesy, attitude,
                     total_score, comments, evaluated_at
                 ) VALUES (
                     :trainee_id, :supervisor_id, :evaluation_type,
-                    :attendance_punctuality, :work_quality, :productivity, :initiative,
-                    :communication_skills, :teamwork_cooperation, :adaptability,
-                    :attitude_conduct, :dependability, :overall_performance,
-                    :total_score, :comments, :evaluated_at
+                    :personality, :punctuality, :courtesy, :attitude,
+                    :total_score, :comments, NOW()
                 )
-            ";
-
-            $stmt = $this->conn->prepare($insertQuery);
+            ");
             $stmt->execute([
-                ':trainee_id' => $traineeId,
-                ':supervisor_id' => $supervisorId,
+                ':trainee_id'      => $traineeId,
+                ':supervisor_id'   => $supervisorId,
                 ':evaluation_type' => $evaluationType,
-                ':attendance_punctuality' => $criteria['attendance_punctuality'] ?? 0,
-                ':work_quality' => $criteria['work_quality'] ?? 0,
-                ':productivity' => $criteria['productivity'] ?? 0,
-                ':initiative' => $criteria['initiative'] ?? 0,
-                ':communication_skills' => $criteria['communication_skills'] ?? 0,
-                ':teamwork_cooperation' => $criteria['teamwork_cooperation'] ?? 0,
-                ':adaptability' => $criteria['adaptability'] ?? 0,
-                ':attitude_conduct' => $criteria['attitude_conduct'] ?? 0,
-                ':dependability' => $criteria['dependability'] ?? 0,
-                ':overall_performance' => $criteria['overall_performance'] ?? 0,
-                ':total_score' => $data['total_score'] ?? 0,
-                ':comments' => $comments,
-                ':evaluated_at' => $data['evaluated_at'] ?? date('Y-m-d H:i:s')
+                ':personality'     => $scores['personality'],
+                ':punctuality'     => $scores['punctuality'],
+                ':courtesy'        => $scores['courtesy'],
+                ':attitude'        => $scores['attitude'],
+                ':total_score'     => array_sum($scores),
+                ':comments'        => mb_substr((string) $comments, 0, 2000),
             ]);
 
             return [

@@ -980,75 +980,128 @@ class AdminController{
         }
     }
 
-    public function getAllEvaluations($data){
+    /**
+     * Trainee evaluations for the web "Trainee Evaluations" page (Figure 4.15 of the study).
+     * Combines the Midterm/Final form (trainee_evaluations) and the 12-item evaluation form
+     * (trainee_evaluationsV2) into one list with the same columns.
+     * Filters: year, evaluation_type
+     */
+    public function getAllEvaluations($params) {
+        $filters = $params['data'] ?? [];
+        $year = (int) ($filters['year'] ?? 0);
+        $type = trim((string) ($filters['evaluation_type'] ?? ''));
 
-        $filters = $data['data'] ?? [];
+        $v1Labels = [
+            'personality' => 'Personality',
+            'punctuality' => 'Punctuality',
+            'courtesy'    => 'Courtesy',
+            'attitude'    => 'Attitude towards Work',
+        ];
+        $v2Labels = [
+            '1a' => 'Has self-discipline and potential for leadership',
+            '1b' => 'Assumes responsibility readily, gets results and group loyalty',
+            '1c' => 'Able to understand clear instructions and does not hesitate',
+            '1d' => 'Accepts suggestions and strives to improve his work',
+            '2a' => 'Makes use of time and does not squander it',
+            '2b' => 'Reports to work regularly on time',
+            '2c' => 'Follows company/agency rules and regulations',
+            '2d' => 'Courteous/polite',
+            '3a' => 'Works accurately, efficiently and effectively',
+            '3b' => 'Accomplishes assigned tasks on time',
+            '3c' => 'Follows directions/instructions correctly',
+            '3d' => 'Produces quality work and shows cooperation with others',
+        ];
 
-        try {
-            $query = "
-                SELECT 
-                    te.id,
-                    te.evaluation_type,
-                    te.attendance_punctuality,
-                    te.work_quality,
-                    te.productivity,
-                    te.initiative,
-                    te.communication_skills,
-                    te.teamwork_cooperation,
-                    te.adaptability,
-                    te.attitude_conduct,
-                    te.dependability,
-                    te.overall_performance,
-                    te.total_score,
-                    te.comments,
-                    te.evaluated_at,
-                    t.id AS trainee_id,
-                    t.complete_name AS trainee_name,
-                    s.id AS supervisor_id,
-                    s.complete_name AS supervisor_name
-                FROM trainee_evaluations te
-                LEFT JOIN users t ON te.trainee_id = t.id
-                LEFT JOIN users s ON te.supervisor_id = s.id
-                WHERE 1 = 1
-            ";
+        $rows = [];
 
-            $params = [];
+        // Midterm / Final evaluations
+        if ($type === '' || in_array($type, ['Midterm', 'Final'], true)) {
+            $sql = "SELECT te.*,
+                        COALESCE(NULLIF(t.complete_name, ''), t.username) AS trainee_name,
+                        COALESCE(NULLIF(s.complete_name, ''), s.username) AS supervisor_name
+                    FROM trainee_evaluations te
+                    JOIN users t ON t.id = te.trainee_id
+                    JOIN users s ON s.id = te.supervisor_id
+                    WHERE 1 = 1";
+            $args = [];
+            if ($type !== '') { $sql .= " AND te.evaluation_type = :type"; $args['type'] = $type; }
+            if ($year > 0)    { $sql .= " AND YEAR(te.evaluated_at) = :year"; $args['year'] = $year; }
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute($args);
 
-            if (!empty($filters['evaluation_type'])) {
-                $query .= " AND te.evaluation_type = :evaluation_type";
-                $params[':evaluation_type'] = $filters['evaluation_type'];
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $criteria = [];
+                foreach ($v1Labels as $key => $label) {
+                    $criteria[] = ['label' => $label, 'points' => (int) $r[$key], 'max' => 5];
+                }
+                $rows[] = [
+                    'id'              => 'e' . $r['id'],
+                    'trainee_name'    => $r['trainee_name'],
+                    'supervisor_name' => $r['supervisor_name'],
+                    'comments'        => $r['comments'],
+                    'evaluation_type' => $r['evaluation_type'],
+                    'evaluated_at'    => $r['evaluated_at'],
+                    'total_score'     => (int) round((int) $r['total_score'] / 20 * 100),
+                    'criteria'        => $criteria,
+                ];
             }
-
-            if (!empty($filters['year'])) {
-                $query .= " AND YEAR(te.evaluated_at) = :year";
-                $params[':year'] = $filters['year'];
-            }
-
-            if (!empty($filters['trainee_id'])) {
-                $query .= " AND te.trainee_id = :trainee_id";
-                $params[':trainee_id'] = $filters['trainee_id'];
-            }
-
-            if (!empty($filters['supervisor_id'])) {
-                $query .= " AND te.supervisor_id = :supervisor_id";
-                $params[':supervisor_id'] = $filters['supervisor_id'];
-            }
-
-            $query .= " ORDER BY te.evaluated_at DESC";
-
-            $stmt = $this->conn->prepare($query);
-            $stmt->execute($params);
-
-            return [
-                'status' => 'success',
-                'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)
-            ];
-        } catch (Exception $e) {
-            return [
-                'status' => 'error',
-                'message' => safeError($e)
-            ];
         }
+
+        // 12-item evaluation form
+        if ($type === '' || $type === 'Evaluation Form') {
+            $sql = "SELECT e.trainee_id, e.supervisor_id, e.item_id, e.points, e.remarks, e.created_at,
+                        COALESCE(NULLIF(t.complete_name, ''), t.username) AS trainee_name,
+                        COALESCE(NULLIF(s.complete_name, ''), s.username) AS supervisor_name
+                    FROM trainee_evaluationsV2 e
+                    JOIN users t ON t.id = e.trainee_id
+                    JOIN users s ON s.id = e.supervisor_id
+                    WHERE 1 = 1";
+            $args = [];
+            if ($year > 0) { $sql .= " AND YEAR(e.created_at) = :year"; $args['year'] = $year; }
+            $sql .= " ORDER BY e.item_id";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute($args);
+
+            $grouped = [];
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $key = $r['trainee_id'] . '-' . $r['supervisor_id'];
+                if (!isset($grouped[$key])) {
+                    $grouped[$key] = [
+                        'id'              => 'f' . $key,
+                        'trainee_name'    => $r['trainee_name'],
+                        'supervisor_name' => $r['supervisor_name'],
+                        'evaluation_type' => 'Evaluation Form',
+                        'evaluated_at'    => $r['created_at'],
+                        'remarks'         => [],
+                        'criteria'        => [],
+                    ];
+                }
+                $g = &$grouped[$key];
+                $g['criteria'][] = [
+                    'label'  => $v2Labels[$r['item_id']] ?? $r['item_id'],
+                    'points' => (int) $r['points'],
+                    'max'    => 5,
+                ];
+                if (trim((string) $r['remarks']) !== '') {
+                    $g['remarks'][] = trim($r['remarks']);
+                }
+                if ($r['created_at'] > $g['evaluated_at']) {
+                    $g['evaluated_at'] = $r['created_at'];
+                }
+                unset($g);
+            }
+            foreach ($grouped as $g) {
+                $points = array_sum(array_column($g['criteria'], 'points'));
+                $max = count($g['criteria']) * 5;
+                $g['total_score'] = $max ? (int) round($points / $max * 100) : 0;
+                $g['comments'] = implode('; ', array_unique($g['remarks']));
+                unset($g['remarks']);
+                $rows[] = $g;
+            }
+        }
+
+        usort($rows, fn ($a, $b) => strcmp((string) $b['evaluated_at'], (string) $a['evaluated_at']));
+        return ['status' => 'success', 'data' => $rows];
     }
 
     /**

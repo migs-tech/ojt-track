@@ -1,35 +1,70 @@
+<!-- Trainee Evaluations page, as in Figure 4.15 of the study -->
 <template>
   <div class="p-6 bg-gray-50 min-h-screen">
     <h1 class="text-2xl font-bold mb-6 text-gray-800">Trainee Evaluations</h1>
 
-    <!-- TABLE LIST -->
+    <!-- 🔍 Filters -->
+    <div class="flex flex-wrap gap-4 items-end mb-6">
+      <!-- Year Filter -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Year</label>
+        <select
+          v-model="filters.year"
+          class="border rounded-lg px-3 py-2 bg-white text-gray-700 focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">All</option>
+          <option v-for="y in availableYears" :key="y" :value="y">{{ y }}</option>
+        </select>
+      </div>
+
+      <!-- Evaluation Type Filter -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Evaluation Type</label>
+        <select
+          v-model="filters.evaluation_type"
+          class="border rounded-lg px-3 py-2 bg-white text-gray-700 focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">All</option>
+          <option value="Midterm">Midterm</option>
+          <option value="Final">Final</option>
+          <option value="Evaluation Form">Evaluation Form</option>
+        </select>
+      </div>
+
+      <!-- Filter Button -->
+      <button
+        @click="fetchEvaluations"
+        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow text-sm"
+      >
+        Apply Filter
+      </button>
+    </div>
+
+    <!-- 📋 Table -->
     <div class="overflow-x-auto bg-white rounded-2xl shadow">
       <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-100">
           <tr>
             <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Trainee</th>
             <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Supervisor</th>
-            <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600">
-              Total Score (%)
-            </th>
+            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Comments</th>
+            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Evaluation Type</th>
+            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Evaluated At</th>
+            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Total Score</th>
             <th class="px-4 py-3 text-center text-sm font-semibold text-gray-600">Action</th>
           </tr>
         </thead>
-
         <tbody class="divide-y divide-gray-100">
-          <tr
-            v-for="item in evaluations"
-            :key="item.trainee_id"
-            class="hover:bg-gray-50"
-          >
-            <td class="px-4 py-3">{{ item.trainee_name }}</td>
-            <td class="px-4 py-3">{{ item.supervisor_name }}</td>
-            <td class="px-4 py-3 text-center font-medium text-gray-700">
-              {{ calculateTotalPercent(item.evaluations) }}%
-            </td>
+          <tr v-for="evalItem in evaluations" :key="evalItem.id" class="hover:bg-gray-50">
+            <td class="px-4 py-3 text-gray-800">{{ evalItem.trainee_name }}</td>
+            <td class="px-4 py-3 text-gray-700">{{ evalItem.supervisor_name }}</td>
+            <td class="px-4 py-3 text-gray-600 truncate max-w-xs">{{ evalItem.comments }}</td>
+            <td class="px-4 py-3 text-gray-500">{{ evalItem.evaluation_type }}</td>
+            <td class="px-4 py-3 text-gray-500">{{ formatDate(evalItem.evaluated_at) }}</td>
+            <td class="px-4 py-3 font-semibold text-gray-800">{{ evalItem.total_score }}</td>
             <td class="px-4 py-3 text-center">
               <button
-                @click="openModal(item)"
+                @click="openModal(evalItem)"
                 class="text-blue-600 hover:text-blue-800 font-medium"
               >
                 View Details
@@ -38,86 +73,64 @@
           </tr>
 
           <tr v-if="!evaluations.length">
-            <td colspan="3" class="text-center py-6 text-gray-500">
-              No evaluations found
-            </td>
+            <td colspan="7" class="text-center py-6 text-gray-500">No evaluations found</td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- MODAL -->
+    <!-- 📊 Modal -->
     <div
       v-if="selectedEvaluation"
       class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50"
     >
-      <div class="bg-white rounded-2xl shadow-lg w-full max-w-4xl p-6 relative animate-fadeIn">
-        
-        <h2 class="text-xl font-semibold text-gray-800 mb-3">
-          {{ selectedEvaluation.trainee_name }} – Evaluation Details
+      <div class="bg-white rounded-2xl shadow-lg w-full max-w-2xl p-6 relative max-h-[90vh] overflow-y-auto">
+        <button
+          @click="selectedEvaluation = null"
+          class="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
+        >
+          ✕
+        </button>
+
+        <h2 class="text-xl font-semibold mb-4 text-gray-800">
+          Evaluation Details - {{ selectedEvaluation.evaluation_type }}
         </h2>
 
-        <p class="text-gray-600 mb-4">
-          Supervisor: <strong>{{ selectedEvaluation.supervisor_name }}</strong>
-        </p>
-
-        <!-- TABLE INSIDE MODAL -->
-        <div class="overflow-x-auto max-h-96 overflow-y-auto border rounded-lg">
-          <table class="min-w-full text-sm">
-            <thead>
-              <tr class="bg-gray-100">
-                <th class="px-3 py-2 text-left font-semibold">Category</th>
-                <th class="px-3 py-2 text-left font-semibold">Criteria</th>
-                <th class="px-3 py-2 text-center font-semibold">Highest Points</th>
-                <th class="px-3 py-2 text-center font-semibold">Points</th>
-                <th class="px-3 py-2 font-semibold">Remarks</th>
-              </tr>
-            </thead>
-            <tbody>
-              <template v-for="(category, catKey) in selectedEvaluation.evaluations" :key="catKey">
-                <!-- CATEGORY TITLE -->
-                <tr class="bg-gray-200">
-                  <td class="px-3 py-2 font-bold" colspan="5">
-                    {{ criteriaLabels[catKey] }}
-                  </td>
-                </tr>
-
-                <!-- CRITERIA -->
-                <tr v-for="(crit, critKey) in category" :key="critKey" class="border-b">
-                  <td class="px-3 py-2">{{ letterMap[critKey.slice(-1)] || '' }}</td>
-                  <td class="px-3 py-2">{{ criteriaDescriptions[critKey] || critKey }}</td>
-                  <td class="px-3 py-2 text-center">5</td>
-                  <td class="px-3 py-2 text-center">{{ crit.points }}</td>
-                  <td class="px-3 py-2">{{ crit.remarks }}</td>
-                </tr>
-
-                <!-- CATEGORY TOTAL -->
-                <tr class="bg-gray-100 font-semibold">
-                  <td colspan="2" class="px-3 py-2 text-left">Total</td>
-                  <td class="px-3 py-2 text-center">{{ calculateCategoryHighest(category) }}</td>
-                  <td class="px-3 py-2 text-center">{{ calculateCategoryTotal(category) }}</td>
-                  <td></td>
-                </tr>
-              </template>
-              <!-- GRAND TOTAL -->
-              <tr class="bg-gray-300 font-bold text-lg">
-                <td colspan="2" class="px-3 py-2 text-left">Grand Total for Affiliate Agency’s Rating</td>
-                <td class="px-3 py-2 text-center">{{ calculateGrandHighest(selectedEvaluation.evaluations) }}</td>
-                <td class="px-3 py-2 text-center">{{ calculateGrandTotal(selectedEvaluation.evaluations) }}</td>
-                <td></td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="grid grid-cols-2 gap-4 text-sm text-gray-700">
+          <div><strong>Trainee:</strong> {{ selectedEvaluation.trainee_name }}</div>
+          <div><strong>Supervisor:</strong> {{ selectedEvaluation.supervisor_name }}</div>
+          <div><strong>Date:</strong> {{ formatDate(selectedEvaluation.evaluated_at) }}</div>
+          <div><strong>Total Score:</strong> {{ selectedEvaluation.total_score }}</div>
         </div>
+
+        <hr class="my-4" />
+
+        <div class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          <div
+            v-for="(item, index) in selectedEvaluation.criteria"
+            :key="index"
+            class="flex justify-between gap-3"
+          >
+            <span>{{ item.label }}</span>
+            <span class="font-medium whitespace-nowrap">{{ item.points }} / {{ item.max }}</span>
+          </div>
+        </div>
+
+        <div class="mt-5">
+          <strong class="text-gray-800">Comments:</strong>
+          <p class="text-gray-600 mt-1">
+            {{ selectedEvaluation.comments || 'No comments provided.' }}
+          </p>
+        </div>
+
         <div class="mt-6 text-right">
           <button
             @click="selectedEvaluation = null"
-            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm"
           >
             Close
           </button>
         </div>
-
       </div>
     </div>
   </div>
@@ -129,105 +142,32 @@ import api from '@/api/api'
 
 const evaluations = ref([])
 const selectedEvaluation = ref(null)
+const filters = ref({
+  year: '',
+  evaluation_type: ''
+})
 
-const criteriaLabels = {
-  1: 'Leadership',
-  2: 'Attitude Towards Work',
-  3: 'Performance',
+const availableYears = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i)
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(String(dateStr).replace(' ', 'T'))
+  return date.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-// Map of criteria keys to descriptive text
-const criteriaDescriptions = {
-  '1a': 'Has self – discipline and potential for leadership',
-  '1b': 'Assumes responsibility readily, gets results and group loyalty',
-  '1c': 'Able to understand clear instructions and does not hesitate',
-  '1d': 'Accepts suggestions and strives to improve his work',
-
-  '2a': 'Makes use of time and does not squander it',
-  '2b': 'Reports to work regularly on time',
-  '2c': 'Follows company/agency rules and regulations',
-  '2d': 'Courteous/polite',
-
-  '3a': 'Works accurately, efficiently and effectively',
-  '3b': 'Accomplishes assigned tasks on time',
-  '3c': 'Follows directions/instructions correctly',
-  '3d': 'Produces quality work and shows cooperation with others',
+const openModal = (evalItem) => {
+  selectedEvaluation.value = evalItem
 }
 
-// Map the last character of key to letters
-const letterMap = { a: 'A.', b: 'B.', c: 'C.', d: 'D.' }
-
-const openModal = (item) => {
-  selectedEvaluation.value = item
-}
-
+// 🧠 Fetch evaluations with optional filters
 const fetchEvaluations = async () => {
   try {
-    const res = await api.post("admin/getEvaluationsTrainee")
-    evaluations.value = res.data.data || []
-  } catch (err) {
-    console.error("Error loading evaluations:", err)
+    const { data } = await api.post('admin/getAllEvaluations', filters.value)
+    evaluations.value = data.data || []
+  } catch (error) {
+    console.error('Failed to fetch evaluations:', error)
   }
-}
-
-// Assuming total max points = 60
-const calculateTotalPercent = (evaluations) => {
-  let total = 0
-  for (const categoryKey in evaluations) {
-    const category = evaluations[categoryKey]
-    for (const critKey in category) {
-      total += category[critKey].points || 0
-    }
-  }
-  const percent = (total / 60) * 100
-  return Math.round(percent) // Round to nearest integer
-}
-
-// Calculate total points for a single category
-// Calculate total points for a single category
-const calculateCategoryTotal = (category) => {
-  let total = 0
-  for (const critKey in category) {
-    total += category[critKey].points || 0
-  }
-  return total
-}
-
-// Calculate highest points for a single category
-const calculateCategoryHighest = (category) => {
-  let total = 0
-  for (const critKey in category) {
-    total += 5 // Assuming max points per criterion = 5
-  }
-  return total
-}
-
-// Calculate grand total for all categories
-const calculateGrandTotal = (evaluations) => {
-  let grandTotal = 0
-  for (const catKey in evaluations) {
-    grandTotal += calculateCategoryTotal(evaluations[catKey])
-  }
-  return grandTotal
-}
-
-// Calculate grand total of highest points
-const calculateGrandHighest = (evaluations) => {
-  let grandTotal = 0
-  for (const catKey in evaluations) {
-    grandTotal += calculateCategoryHighest(evaluations[catKey])
-  }
-  return grandTotal
 }
 
 onMounted(fetchEvaluations)
 </script>
-<style scoped>
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.animate-fadeIn {
-  animation: fadeIn 0.2s ease-out;
-}
-</style>

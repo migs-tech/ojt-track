@@ -79,7 +79,6 @@ class Access {
             'saveEvaluationV2'        => [self::SUPERVISOR],
             'checkEvaluationExists'   => [self::SUPERVISOR],
             'unEnrollTrainee'         => [self::SUPERVISOR],
-            'insertAttendanceForTrainee' => 'cron',
         ],
         'attendance' => [
             'getAttendanceByUserId'   => 'auth',
@@ -114,6 +113,7 @@ class Access {
             'getRecentEvaluations'    => self::STAFF,
             'getOjtHoursCompletionStats' => self::STAFF,
             'getEvaluationsTrainee'   => self::STAFF,
+            'getAllEvaluations'       => self::STAFF,
             'getCompletedOjtTrainees' => self::STAFF,
             'generateTraineeDetails'  => self::STAFF,
             'getTeacherList'          => [self::ADMIN],

@@ -152,7 +152,28 @@ const routes = {
   },
 
   "admin/getEvaluationsTrainee": () => ({ success: true, data: db.evaluations }),
-  "admin/getAllEvaluations": () => ({ success: true, data: db.evaluations }),
+  "admin/getAllEvaluations": (b) => {
+    // Same shape as the API: Midterm/Final rows with 4 criteria (max 20 points).
+    const labels = ["Personality", "Punctuality", "Courtesy", "Attitude towards Work"];
+    const comments = ["Hardworking and reliable.", "Shows initiative on tasks.", "Good attitude, keep improving.", "Very good at handling work papers."];
+    let rows = db.evaluations.map((e, i) => {
+      const points = labels.map((_, k) => Math.max(1, Math.min(5, e.evaluations[String(k % 3 + 1)][`${k % 3 + 1}${"abcd"[k]}`].points)));
+      const date = new Date(Date.now() - (i * 3 + 1) * 86400000);
+      return {
+        id: "e" + e.trainee_id,
+        trainee_name: e.trainee_name,
+        supervisor_name: e.supervisor_name,
+        comments: comments[i % comments.length],
+        evaluation_type: i % 2 ? "Final" : "Midterm",
+        evaluated_at: date.toISOString(),
+        total_score: Math.round((points.reduce((a, p) => a + p, 0) / 20) * 100),
+        criteria: labels.map((label, k) => ({ label, points: points[k], max: 5 })),
+      };
+    });
+    if (b.evaluation_type) rows = rows.filter((r) => r.evaluation_type === b.evaluation_type);
+    if (b.year) rows = rows.filter((r) => new Date(r.evaluated_at).getFullYear() === Number(b.year));
+    return { status: "success", data: rows };
+  },
 };
 
 const toRoute = (url = "") =>

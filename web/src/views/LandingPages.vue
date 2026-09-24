@@ -1,6 +1,6 @@
 <template>
 <div class="bg-white">
-    <!-- Header -->
+    <!-- Header (as in Figure 4.8 of the study) -->
     <header class="fixed w-full top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200">
     <nav class="container mx-auto px-6 py-4">
       <div class="flex items-center justify-between">
@@ -13,20 +13,18 @@
         </div>
 
         <!-- Desktop Auth Buttons -->
-        <div class="hidden md:flex items-center space-x-3">
-          <button class="px-5 py-2 text-gray-700 font-medium hover:text-blue-600 transition duration-200 bg-blue-300 rounded-lg shadow-md hover:shadow-lg" @click="goToLogin">
+        <div class="hidden md:flex items-center space-x-4">
+          <button class="px-6 py-2 text-gray-700 font-medium hover:text-blue-600 transition duration-200" @click="goToLogin">
             Login
           </button>
-          <button class="px-5 py-2 bg-blue-500 text-white font-medium rounded-lg hover:from-blue-700 hover:to-indigo-700 transition duration-200 shadow-md hover:shadow-lg" @click="goToRegister">
+          <button class="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium rounded-lg hover:from-blue-700 hover:to-indigo-700 transition duration-200 shadow-md hover:shadow-lg" @click="goToRegister">
             Register
           </button>
           <a
-            v-if="apkDownloadUrl"
             :href="apkDownloadUrl"
-            download="ojt-tracking.apk"
-            class="px-5 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition duration-200 shadow-md hover:shadow-lg flex items-center space-x-2"
+            class="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition duration-200 shadow-md hover:shadow-lg flex items-center space-x-2"
           >
-            <i class="fas fa-download text-white text-lg"></i>
+            <i class="fas fa-mobile-alt text-white"></i>
             <span>Download App</span>
           </a>
         </div>
@@ -42,19 +40,17 @@
 
       <!-- Mobile Menu -->
       <div v-if="mobileMenuOpen" class="md:hidden mt-4 flex flex-col space-y-3">
-        <button class="px-5 py-2 text-gray-700 font-medium hover:text-blue-600 transition duration-200 bg-blue-300 rounded-lg shadow-md hover:shadow-lg" @click="goToLogin">
+        <button class="px-6 py-2 text-gray-700 font-medium hover:text-blue-600 transition duration-200 text-left" @click="goToLogin">
           Login
         </button>
-        <button class="px-5 py-2 bg-blue-500 text-white font-medium rounded-lg hover:from-blue-700 hover:to-indigo-700 transition duration-200 shadow-md hover:shadow-lg" @click="goToRegister">
+        <button class="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium rounded-lg shadow-md" @click="goToRegister">
           Register
         </button>
         <a
-          v-if="apkDownloadUrl"
-            :href="apkDownloadUrl"
-          download="ojt-tracking.apk"
-          class="px-5 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition duration-200 shadow-md hover:shadow-lg flex items-center space-x-2"
+          :href="apkDownloadUrl"
+          class="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition duration-200 shadow-md flex items-center justify-center space-x-2"
         >
-          <i class="fas fa-download text-white text-lg"></i>
+          <i class="fas fa-mobile-alt text-white"></i>
           <span>Download App</span>
         </a>
       </div>
@@ -67,10 +63,7 @@
                 <!-- Left Content -->
                 <div class="flex-1 text-center lg:text-left">
                     <div class="inline-block px-4 py-2 bg-blue-50 border border-blue-200 rounded-full mb-6">
-                        <span class="text-blue-600 font-semibold text-sm flex items-center gap-1">
-                            <i class="fas fa-rocket"></i>
-                            Transform Your Training Experience
-                        </span>
+                        <span class="text-blue-600 font-semibold text-sm">🚀 Transform Your Training Experience</span>
                     </div>
                     <h1 class="text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6">
                         Track Your OJT<br/>
@@ -91,14 +84,34 @@
                     </div>
                 </div>
 
-                <!-- Right Visual -->
-                <div v-if="apkUrl" class="relative flex-1 w-full">
-                <div class="relative w-full h-96 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 shadow-2xl">
-                    <div class="qrcode-container">
-                    <h2>{{ isDemo ? "Scan to open the demo on your phone" : "Scan to download the APP" }}</h2>
-                    <qrcode-vue :value="apkUrl" :size="300" :fg-color="'#1b4ad7'" />
+                <!-- Right Visual: dashboard mockup (as in Figure 4.8 / Appendix E) -->
+                <div class="flex-1 relative w-full">
+                    <div class="relative w-full h-96 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 shadow-2xl">
+                        <div class="bg-white rounded-lg shadow-lg p-6 h-full flex flex-col">
+                            <div class="flex items-center justify-between mb-6">
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-3 h-3 bg-red-400 rounded-full"></div>
+                                    <div class="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                                    <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+                                </div>
+                                <div class="text-xs font-semibold text-gray-500">Dashboard</div>
+                            </div>
+                            <div class="space-y-4 flex-1">
+                                <div class="h-16 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg animate-pulse"></div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="h-20 bg-blue-100 rounded-lg"></div>
+                                    <div class="h-20 bg-indigo-100 rounded-lg"></div>
+                                </div>
+                                <div class="h-24 bg-gray-100 rounded-lg"></div>
+                            </div>
+                        </div>
+                        <!-- Floating card -->
+                        <div class="absolute -top-4 -right-4 w-24 h-24 bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl shadow-lg flex items-center justify-center animate-bounce">
+                            <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
                     </div>
-                </div>
                 </div>
             </div>
         </div>
@@ -193,7 +206,6 @@
 <script setup>
 import { useRouter } from 'vue-router';
 import { ref } from "vue";
-import QrcodeVue from "qrcode.vue";
 import logo from "@/assets/icon.png";
 import { isDemo } from "@/demo";
 const mobileMenuOpen = ref(false);
@@ -202,25 +214,10 @@ const router = useRouter();
 const goToRegister = () => router.push("/register");
 const goToLogin = () => router.push("/login");
 
-// Link to the Android app (e.g. a GitHub release asset). Download buttons and QR are hidden when not set.
-const apkDownloadUrl = isDemo ? "" : import.meta.env.VITE_APK_URL || "";
-const apkUrl = isDemo ? window.location.origin + import.meta.env.BASE_URL : apkDownloadUrl;
+// "Download App" link for the Android APK. By default it points to the APK attached to the
+// latest GitHub release (upload it as ojt-track.apk); set VITE_APK_URL to use another link.
+const apkDownloadUrl =
+  import.meta.env.VITE_APK_URL ||
+  "https://github.com/migs-tech/ojt-track/releases/latest/download/ojt-track.apk";
 </script>
 
-<style scoped>
-.qrcode-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  color: #1b4ad7;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-.qrcode-container h2 {
-  margin-bottom: 15px;
-  font-size: 18px;
-  color: #333;
-}
-</style>

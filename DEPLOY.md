@@ -69,7 +69,7 @@ Collect the values marked **📋** as you go. You'll paste them into Render in s
 3. Add the environment variables:
    - `VITE_API_URL` = `https://<your-api>.onrender.com/api`
    - `VITE_RECAPTCHA_SITE_KEY` = the reCAPTCHA site key from step 4
-   - `VITE_APK_URL` = link to the Android APK (optional; add it after step 9)
+   - `VITE_APK_URL` is optional. The **Download App** button already points to the APK in your latest GitHub release (step 9).
 4. Deploy, then go back to Render and set `APP_URL` and `ALLOWED_ORIGINS` to the Vercel address.
 
 ## 7. Keep-awake and scheduled jobs: cron-job.org
@@ -118,7 +118,10 @@ These times are suggestions based on what each job checks. Some jobs only act at
    ```bash
    npx eas-cli build --platform android --profile preview
    ```
-4. When the build finishes, download the APK and share it, for example as a GitHub release. Then set that link as `VITE_APK_URL` on Vercel.
+4. When the build finishes, download the APK and rename it to **`ojt-track.apk`**.
+5. On GitHub, open the `ojt-track` repo, then go to **Releases → Draft a new release**. Create a tag (for example `v1.0.0`), attach `ojt-track.apk`, and publish.
+   The **Download App** button on the website, as shown in Figure 4.8 of the study, links to
+   `https://github.com/migs-tech/ojt-track/releases/latest/download/ojt-track.apk`, so it starts working as soon as the release is published. For every new app version, publish a new release with the same file name.
 
 **Push notifications** need your own Firebase project. Download its `google-services.json` into `mobile/`; it isn't committed to git. Without it, the app works but push notifications are off.
 
