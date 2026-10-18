@@ -239,7 +239,7 @@ export const demoUser = {
   username: "admin@demo.com",
   complete_name: "Demo Admin",
   email: "admin@demo.com",
-  role: 0,
+  role: 4,
   status: 1,
   birthdate: "1990-01-01",
   avatar_url: null,

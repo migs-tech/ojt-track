@@ -41,7 +41,7 @@ const readBody = (data) => {
 const ok = (message) => ({ success: true, message });
 
 const routes = {
-  "user/login": () => ({ user: db.demoUser, token: "demo-token" }),
+  "user/login": () => ({ success: true, user: db.demoUser, token: "demo-token" }),
   "user/logout": () => ({ success: true }),
   "user/register": () => ({
     success: false,
